@@ -101,6 +101,12 @@ static func _worker(name: String, content: Dictionary) -> Array:
 			return []
 		"worker.metrics" when worker:
 			return [Effects.WorkerLoad.new(worker, optional_number(content, "cpu_usage_pct"))]
+		"worker.connected", "worker.disconnected" when worker:
+			var connected := name == "worker.connected"
+			return [
+				Effects.WorkerLink.new(worker, connected),
+				Effects.Headline.new("worker     %s {0}" % ("online" if connected else "offline"), "good" if connected else "bad", worker, "worker %s" % short(worker)),
+			]
 		"worker.network" when worker:
 			return [Effects.WorkerNetwork.new(worker, optional_number(content, "network_speed_mbps"))]
 		"worker.job_dispatched" when worker:

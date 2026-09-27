@@ -25,6 +25,15 @@ class WorkerLoad:
 		cpu = p_cpu
 
 
+class WorkerLink:
+	var worker_id: String
+	var connected: bool
+
+	func _init(p_worker_id: String, p_connected: bool) -> void:
+		worker_id = p_worker_id
+		connected = p_connected
+
+
 class WorkerNetwork:
 	var worker_id: String
 	var mbps: Variant

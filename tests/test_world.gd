@@ -553,6 +553,21 @@ func test_average_worker_network_ignores_workers_without_samples() -> void:
 	equal(world.average_network(), 20.0)
 
 
+func test_disconnected_worker_loses_its_link_and_regains_it() -> void:
+	var world := World.new()
+	world.apply(Effects.WorkerLoad.new("w1", 10.0))
+	var worker: Bodies.Worker = world.workers["w1"]
+	equal([worker.connected, worker.link], [true, 1.0])
+	world.apply(Effects.WorkerLink.new("w1", false))
+	world.update(World.LINK_FADE / 2)
+	check(not worker.connected and worker.link > 0.0 and worker.link < 1.0, "glitching out: %s" % worker.link)
+	world.update(World.LINK_FADE)
+	equal(worker.link, 0.0)
+	world.apply(Effects.WorkerLink.new("w1", true))
+	world.update(World.LINK_FADE)
+	equal([worker.connected, worker.link], [true, 1.0])
+
+
 func test_worker_load_sets_cpu_and_overload_throws_sparks() -> void:
 	var world := World.new()
 	world.apply(Effects.WorkerLoad.new("w1", 40.0))

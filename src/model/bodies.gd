@@ -12,6 +12,8 @@ class Worker:
 	var position := Vector3.ZERO
 	var cpu: Variant = null
 	var network: Variant = null
+	var connected := true
+	var link := 1.0
 	var born: float
 
 	var unstable: bool:

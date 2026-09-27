@@ -87,6 +87,14 @@ func test_skipped_build_status_is_known() -> void:
 	equal(EventParser.parse(ev("build.status_changed", {"build_id": "b1", "evaluation_id": "e1", "status": 10}))[0].state, "skipped")
 
 
+func test_worker_connection_events_toggle_the_link() -> void:
+	var lost := EventParser.parse(ev("worker.disconnected", {"worker_id": "w1"}))
+	equal([lost[0].worker_id, lost[0].connected], ["w1", false])
+	check(lost[1] is Effects.Headline and lost[1].tone == "bad", "headline")
+	var back: Effects.WorkerLink = EventParser.parse(ev("worker.connected", {"worker_id": "w1", "projects": []}))[0]
+	equal(back.connected, true)
+
+
 func test_worker_network_carries_mbps() -> void:
 	var network: Effects.WorkerNetwork = only(EventParser.parse(ev("worker.network", {"worker_id": "w1", "network_speed_mbps": 12.5})))
 	equal([network.worker_id, network.mbps], ["w1", 12.5])

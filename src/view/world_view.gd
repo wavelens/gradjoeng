@@ -31,6 +31,11 @@ const RIM_REACH := 1.08
 const LINK_LANE := 0.085
 const LINK_PACKETS := 40
 const SHOCK_WIDTH := 0.35
+const LINK_SHARDS := 16
+const STRIKES := 28.0
+const WARM := 0.85
+const OFFLINE_JITTER := 0.35
+const OFFLINE_GARBLE := 0.25
 const CACHE_DASH := 0.6
 const CACHE_GAP := 0.4
 const LABEL := Color("e6e6f5")
@@ -172,7 +177,33 @@ func _material(shader: Shader) -> ShaderMaterial:
 func _links(world: World) -> void:
 	links.material_override.set_shader_parameter("time", world.time)
 	for worker in world.workers.values():
-		_link(World.server_position(), worker.position, 0.5 + worker.heat)
+		if not worker.connected:
+			if worker.link > 0.0:
+				_broken_link(World.server_position(), worker.position, worker.link)
+			continue
+		var lit := flicker(worker.link)
+		if lit > 0.0:
+			_link(World.server_position(), worker.position, (0.5 + worker.heat) * lit)
+
+
+static func flicker(progress: float) -> float:
+	if progress >= WARM:
+		return 1.0
+	var strike := floorf(progress * STRIKES)
+	var roll := fposmod(sin(strike * 12.9898) * 43758.5453, 1.0)
+	return 1.0 + 0.6 * (1.0 - progress) if roll < 0.25 + 0.6 * progress else 0.0
+
+
+func _broken_link(start: Vector3, end: Vector3, link: float) -> void:
+	var side := (end - start).cross(Vector3.UP).normalized()
+	var color := Palette.shade(Palette.LINK, link)
+	for i in LINK_SHARDS:
+		if randf() > link:
+			continue
+		var jolt := side * randf_range(-1.0, 1.0) * (1.0 - link) * 1.5
+		var from := start.lerp(end, float(i) / LINK_SHARDS) + jolt
+		var to := start.lerp(end, float(i + 1) / LINK_SHARDS) + jolt
+		ribbons.segment(from, to, color, color, LINK_LANE * 2.0 * randf_range(0.3, 1.0))
 
 
 func _link(start: Vector3, end: Vector3, energy: float) -> void:
@@ -282,17 +313,31 @@ func _workers(world: World) -> void:
 		var color: Color = Palette.WORKER if worker.cpu == null else Palette.cpu(worker.cpu)
 		var at: Vector3 = worker.position
 		var heat: float = worker.heat
+		var offline: float = 1.0 - worker.link
 		if worker.unstable:
 			at += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * 0.07
 			heat = maxf(heat, randf())
+		if offline > 0.0:
+			var luma := color.get_luminance()
+			color = color.lerp(Color(luma, luma, luma), offline)
+			at += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * OFFLINE_JITTER * offline
+			heat *= worker.link
 		var pulse := 0.5 + 0.5 * sin(world.time * 3.0 + at.x)
 		var behind := at + (at - eye).normalized() * WORKER_RADIUS
 		glows.add(behind, 1.9 + heat * 0.85 + pulse * 0.14, Palette.shade(color.lerp(Palette.ATMOSPHERE, 0.5), (0.7 + heat * 0.6) * 0.3))
-		planets.add(at, WORKER_RADIUS, color, Color(planet_seed(worker.id), heat, 0, 0))
+		planets.add(at, WORKER_RADIUS, color, Color(planet_seed(worker.id), heat, offline, 0.0 if worker.cpu == null else 1.0))
 		var label := world.worker_label(worker)
-		if worker.cpu != null:
+		if worker.cpu != null and worker.connected:
 			label += "  %d%%" % roundi(worker.cpu)
-		labels.show_text(Detection.decoded(label, world.time - worker.born, hash(worker.id)), at + Vector3.UP * (WORKER_RADIUS + 0.9), color, WORKER_TEXT)
+		label = Detection.decoded(label, world.time - worker.born, hash(worker.id))
+		labels.show_text(garbled(label, OFFLINE_GARBLE * offline), at + Vector3.UP * (WORKER_RADIUS + 0.9), color, WORKER_TEXT)
+
+
+static func garbled(text: String, odds: float) -> String:
+	var result := ""
+	for character in text:
+		result += Detection.GLYPHS[randi() % Detection.GLYPHS.length()] if character != " " and randf() < odds else character
+	return result
 
 
 func _evaluations(world: World) -> void:

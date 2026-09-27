@@ -34,6 +34,7 @@ const FORMATION_GAP := 0.45
 const UNSTABLE_SPARK_RATE := 4.0
 const ECHO_TIME := 0.45
 const SHOCK_TIME := 0.8
+const LINK_FADE := 1.2
 const SCORE_HALF := 600.0
 
 var time := 0.0
@@ -76,6 +77,8 @@ func apply(effect: Variant) -> void:
 		_pace(effect)
 	elif effect is Effects.WorkerLoad:
 		_worker(effect.worker_id).cpu = effect.cpu
+	elif effect is Effects.WorkerLink:
+		_worker(effect.worker_id).connected = effect.connected
 	elif effect is Effects.WorkerNetwork:
 		_worker(effect.worker_id).network = effect.mbps
 	elif effect is Effects.EvaluationChanged:
@@ -558,6 +561,7 @@ func _update_workers(dt: float) -> void:
 	for worker in workers.values():
 		worker.angle += wrapf(worker.target - worker.angle, -PI, PI) * minf(dt * 2.5, 1.0)
 		worker.heat *= pow(0.25, dt)
+		worker.link = move_toward(worker.link, 1.0 if worker.connected else 0.0, dt / LINK_FADE)
 		_place_worker(worker)
 		if worker.unstable and randf() < dt * UNSTABLE_SPARK_RATE:
 			_spawn(Spark.burst(worker.position, Palette.cpu(worker.cpu), 8, 3.0, 0.6))

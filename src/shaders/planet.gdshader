@@ -17,6 +17,8 @@ varying vec4 tint;
 varying float seed;
 varying float heat;
 varying vec3 light;
+varying float offline;
+varying float loaded;
 
 float bayer(vec2 pixel) {
 	int index = int(mod(pixel.x, 4.0)) + int(mod(pixel.y, 4.0)) * 4;
@@ -53,10 +55,18 @@ void vertex() {
 	tint = COLOR;
 	seed = INSTANCE_CUSTOM.x;
 	heat = INSTANCE_CUSTOM.y;
+	offline = INSTANCE_CUSTOM.z;
+	loaded = INSTANCE_CUSTOM.w;
+}
+
+vec2 torn(vec2 uv) {
+	float frame = floor(TIME * 24.0);
+	float tear = hash13(vec3(floor(uv.y * 14.0), frame, seed * 97.0));
+	return uv + vec2(step(0.55, tear) * (tear - 0.75) * 0.6 * offline, 0.0);
 }
 
 void fragment() {
-	vec2 p = UV * 2.0 - 1.0;
+	vec2 p = torn(UV) * 2.0 - 1.0;
 	float r = length(p);
 	if (r > 1.0 || tint.a < bayer(FRAGCOORD.xy)) {
 		discard;
@@ -86,5 +96,9 @@ void fragment() {
 	vec3 atmosphere = mix(SKY, tint.rgb, 0.45);
 	float rim = pow(1.0 - facing.z, 4.0);
 	color = mix(color, atmosphere, rim * (0.08 + 0.6 * smoothstep(-0.2, 0.4, lambert)));
+	float luma = dot(color, vec3(0.299, 0.587, 0.114));
+	color = mix(color, tint.rgb * luma * 2.2, loaded * 0.8);
+	color = mix(color, vec3(luma), offline);
+	color *= 1.0 - 0.6 * offline * step(0.8, hash13(vec3(floor(UV.y * 40.0), floor(TIME * 24.0), 3.0)));
 	ALBEDO = color * energy;
 }
