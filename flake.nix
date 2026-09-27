@@ -16,12 +16,7 @@
     checks.gradjoeng = self.packages.${system}.gradjoeng;
 
     devShells.default = pkgs.mkShell {
-      packages = [
-        (pkgs.python3.withPackages (ps: self.packages.${system}.gradjoeng.dependencies ++ [ ps.pytest ]))
-      ];
-      shellHook = ''
-        export PYTHONPATH="$PWD/src''${PYTHONPATH:+:$PYTHONPATH}"
-      '';
+      packages = [ pkgs.godot ];
     };
   }));
 }

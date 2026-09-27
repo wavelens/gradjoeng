@@ -1,64 +1,68 @@
 {
   lib,
-  python3Packages,
+  stdenvNoCC,
+  godot,
+  makeWrapper,
   dejavu_fonts,
-  fontconfig,
+  inter,
   makeFontsConf,
-  mesa,
 }:
 
 let
-  fontsConf = makeFontsConf { fontDirectories = [ dejavu_fonts ]; };
+  fontsConf = makeFontsConf { fontDirectories = [
+    dejavu_fonts
+    inter
+  ]; };
 in
-python3Packages.buildPythonApplication (finalAttrs: {
+stdenvNoCC.mkDerivation {
   pname = "gradjoeng";
   version = "0.1.0";
-  pyproject = true;
 
   src = lib.fileset.toSource {
     root = ../..;
     fileset = lib.fileset.unions [
-      ../../pyproject.toml
+      ../../project.godot
+      ../../export_presets.cfg
+      ../../main.tscn
+      ../../icon.svg
       ../../src
       ../../tests
     ];
   };
 
-  build-system = with python3Packages; [
-    setuptools
+  nativeBuildInputs = [
+    godot
+    makeWrapper
   ];
 
-  dependencies = with python3Packages; [
-    moderngl
-    pygame-ce
-    websockets
-  ];
-
-  makeWrapperArgs = [
-    "--unset PYTHONPATH"
-    "--set-default FONTCONFIG_FILE ${fontsConf}"
-    "--prefix PATH : ${lib.makeBinPath [ fontconfig ]}"
-  ];
-
-  nativeCheckInputs = with python3Packages; [
-    pytestCheckHook
-  ] ++ [ fontconfig ];
-
-  pytestFlags = [ "-rs" ];
-
-  preCheck = ''
-    export HOME=$(mktemp -d)
-    export FONTCONFIG_FILE=${fontsConf}
-    export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
-    export __EGL_VENDOR_LIBRARY_DIRS=${mesa}/share/glvnd/egl_vendor.d
-    export EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1
+  buildPhase = ''
+    runHook preBuild
+    export HOME=$TMPDIR
+    godot --headless --path . --import
+    godot --headless --path . --export-pack Linux gradjoeng.pck
+    runHook postBuild
   '';
 
-  pythonImportsCheck = [ "gradjoeng" ];
+  doCheck = true;
+  checkPhase = ''
+    runHook preCheck
+    patchShebangs tests/run.sh
+    tests/run.sh
+    runHook postCheck
+  '';
+
+  installPhase = ''
+    runHook preInstall
+    install -Dm644 gradjoeng.pck $out/share/gradjoeng/gradjoeng.pck
+    makeWrapper ${godot}/bin/godot $out/bin/gradjoeng \
+      --add-flags "--main-pack $out/share/gradjoeng/gradjoeng.pck --" \
+      --set-default FONTCONFIG_FILE ${fontsConf}
+    runHook postInstall
+  '';
 
   meta = {
     description = "Live view of Gradient CI events";
-    homepage = "https://github.com/wavelens/gradient";
     mainProgram = "gradjoeng";
+    platforms = lib.platforms.linux;
   };
-})
+}
