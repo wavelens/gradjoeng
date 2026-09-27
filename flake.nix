@@ -10,6 +10,7 @@
   in {
     packages = rec {
       gradjoeng = pkgs.callPackage ./nix/packages/gradjoeng.nix { };
+      release = pkgs.callPackage ./nix/packages/gradjoeng.nix { release = true; };
       default = gradjoeng;
     };
 

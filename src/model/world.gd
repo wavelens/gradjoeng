@@ -7,12 +7,13 @@ const FLARE_COLOR := Color("ff5a1e")
 const WORKER_RING := 40.0
 const WORKER_SPIN := 0.04
 const WORKER_ORBIT_MAX := 5.5
-const CACHE_HEIGHT := 17.0
-const CACHE_DEPTH := -14.0
+const CACHE_ARC_CENTER := Vector3(0.0, 17.0, 0.0)
+const CACHE_ARC := 18.0
+const CACHE_SPACING := 14.0
 const SKY := 60.0
 const EVAL_LINGER := 10.0
 const EVAL_FADE := 3.0
-const EVAL_STALE := 90.0
+const EVAL_STALE := 30.0
 const EVAL_BUSY_STALE := 1800.0
 const CALM_DELAY := 30.0
 const CALM_FADE := 1.5
@@ -21,15 +22,18 @@ const MAX_FX := 2500
 const MAX_HEADLINES := 9
 const MAX_MESSAGES := 14
 const MESSAGE_GAP := 0.005
+const PUSH_GAPS := [0.0, 0.001]
 const MESSAGE_LAG := 2.0
-const UNASSIGNED := "unassigned"
 const SERVER := "server"
 const WORKER_PHASES := ["fetching", "evaluating"]
 const ACTIVITY := ["nar_push", "log_chunk"]
+const OFFER := "job_offer"
+const SCORES := "request_job_chunk"
 const GOLDEN_ANGLE := PI * (3.0 - sqrt(5.0))
 const FORMATION_GAP := 0.45
 const UNSTABLE_SPARK_RATE := 4.0
 const ECHO_TIME := 0.45
+const SHOCK_TIME := 0.8
 const SCORE_HALF := 600.0
 
 var time := 0.0
@@ -43,6 +47,7 @@ var caches := {}
 var build_owner := {}
 var dispatched := {}
 var names := {}
+var offers := {}
 var pacing := {}
 var backlog := []
 var fx := []
@@ -71,6 +76,8 @@ func apply(effect: Variant) -> void:
 		_pace(effect)
 	elif effect is Effects.WorkerLoad:
 		_worker(effect.worker_id).cpu = effect.cpu
+	elif effect is Effects.WorkerNetwork:
+		_worker(effect.worker_id).network = effect.mbps
 	elif effect is Effects.EvaluationChanged:
 		_evaluation_changed(effect)
 	elif effect is Effects.BuildChanged:
@@ -78,11 +85,11 @@ func apply(effect: Variant) -> void:
 	elif effect is Effects.JobDispatched:
 		_dispatch(effect)
 	elif effect is Effects.ServerPulse:
-		_pulse()
+		_pulse(effect.kind)
 	elif effect is Effects.CacheAccess:
 		_cache_access(effect)
 	elif effect is Effects.CacheStored:
-		_feed_caches(server_position)
+		_store(effect.cache_id)
 	elif effect is Effects.CacheQueried:
 		_query_caches()
 	elif effect is Effects.Names:
@@ -126,6 +133,13 @@ func cache_label(cache: Bodies.Cache) -> String:
 	return names.get(cache.id, "cache %s" % cache.id.substr(0, 8))
 
 
+func average_network() -> Variant:
+	var samples := workers.values().filter(func(worker: Bodies.Worker): return worker.network != null)
+	if samples.is_empty():
+		return null
+	return samples.reduce(func(total: float, worker: Bodies.Worker): return total + worker.network, 0.0) / samples.size()
+
+
 func electrons() -> Array:
 	var result := []
 	for evaluation in evaluations.values():
@@ -160,7 +174,7 @@ static func byte_size(size: int) -> String:
 
 func _pace(message: Effects.WorkerMessage) -> void:
 	var ready := minf(maxf(time, pacing.get(message.worker_id, time)), time + MESSAGE_LAG)
-	pacing[message.worker_id] = ready + MESSAGE_GAP
+	pacing[message.worker_id] = ready + (PUSH_GAPS.pick_random() if message.kind in ACTIVITY else MESSAGE_GAP)
 	if ready <= time:
 		_message(message)
 	else:
@@ -179,7 +193,9 @@ func _release() -> void:
 
 func _message(message: Effects.WorkerMessage) -> void:
 	var worker := _worker(message.worker_id)
-	var line := "{0}  %s  %s  %s" % ["->" if message.outbound else "<-", message.kind, byte_size(message.size)]
+	var line := "{0}  %s  %s" % ["->" if message.outbound else "<-", message.kind]
+	if message.size > 0:
+		line += "  " + byte_size(message.size)
 	messages.push_front(Bodies.Headline.new(line, message.kind, time, worker.id, "worker %s" % worker.id.substr(0, 8)))
 	messages.resize(mini(messages.size(), MAX_MESSAGES))
 	if message.kind in ACTIVITY:
@@ -187,6 +203,12 @@ func _message(message: Effects.WorkerMessage) -> void:
 	if message.kind == "nar_push":
 		drought = 0.0
 	_claim(message.job_id, worker)
+	if message.kind == OFFER:
+		_offer(worker)
+		return
+	if message.kind == SCORES:
+		_answer(worker)
+		return
 	if fx.size() > MAX_FX:
 		return
 	var at_worker := func() -> Vector3: return worker.position
@@ -235,8 +257,9 @@ func _evaluation_changed(change: Effects.EvaluationChanged) -> void:
 
 
 func _build_changed(change: Effects.BuildChanged) -> void:
-	var owner: String = change.evaluation_id if change.evaluation_id else build_owner.get(change.build_id, UNASSIGNED)
-	var evaluation := _evaluation(owner)
+	var evaluation: Bodies.Evaluation = evaluations.get(change.evaluation_id if change.evaluation_id else build_owner.get(change.build_id, ""))
+	if not evaluation:
+		return
 	var build := _build(evaluation, change.build_id)
 	if change.derivation_build:
 		build.derivation_build = change.derivation_build
@@ -244,7 +267,7 @@ func _build_changed(change: Effects.BuildChanged) -> void:
 		return
 	build.state = change.state
 	if change.state == "building" and dispatched.has(build.derivation_build):
-		_board_derivation(build.derivation_build, _worker(dispatched[build.derivation_build]), 0.0)
+		_board_derivation(build.derivation_build, _worker(dispatched[build.derivation_build]))
 	elif change.state != "building":
 		_send_build_home(evaluation, build)
 	if build.finished:
@@ -257,7 +280,6 @@ func _build_changed(change: Effects.BuildChanged) -> void:
 		_substitute(build, color)
 	elif change.state in EventParser.GOOD:
 		_spawn(Spark.burst(build.position, color, 18, 3.8, 0.9))
-		_feed_caches(func() -> Vector3: return build.position)
 	elif change.state in EventParser.BAD:
 		shake = maxf(shake, 0.5)
 		_spawn(Spark.burst(build.position, color, 45, 6.4, 1.3))
@@ -284,20 +306,20 @@ func _substitution_source(build: Bodies.Build) -> Callable:
 func _dispatch(dispatch: Effects.JobDispatched) -> void:
 	var worker := _worker(dispatch.worker_id)
 	worker.heat = 1.0
+	if offers.has(worker.id):
+		offers[worker.id].score = dispatch.score
 	_spawn([Ripple.new(func() -> Vector3: return worker.position, Palette.DISPATCH, 1.0, 0.7, 0.05)])
 	if dispatch.derivation_build:
 		dispatched[dispatch.derivation_build] = worker.id
-		_board_derivation(dispatch.derivation_build, worker, dispatch.score)
+		_board_derivation(dispatch.derivation_build, worker)
 	elif dispatch.evaluation_id:
 		var evaluation := _evaluation(dispatch.evaluation_id)
 		_start(evaluation)
-		_board(evaluation, worker, dispatch.score)
+		_board(evaluation, worker)
 
 
-func _board(job: Variant, worker: Bodies.Worker, score: float) -> void:
-	var at_worker := func() -> Vector3: return worker.position
-	_echo(func() -> Vector3: return job.position, at_worker, score)
-	job.electron.jump(worker_host(worker.id), at_worker, _worker_orbit(worker.id), 2 * ECHO_TIME)
+func _board(job: Variant, worker: Bodies.Worker) -> void:
+	job.electron.jump(worker_host(worker.id), func() -> Vector3: return worker.position, _worker_orbit(worker.id), 2 * SHOCK_TIME)
 
 
 func _claim(job_id: String, worker: Bodies.Worker) -> void:
@@ -308,12 +330,13 @@ func _claim(job_id: String, worker: Bodies.Worker) -> void:
 			var evaluation: Bodies.Evaluation = evaluations.get(id)
 			if not evaluation:
 				return
+			evaluation.idle = 0.0
 			_start(evaluation)
 			if evaluation.phase in WORKER_PHASES and evaluation.electron.host != host:
-				_board(evaluation, worker, 0.0)
+				_board(evaluation, worker)
 		"build":
 			dispatched[id] = worker.id
-			_board_derivation(id, worker, 0.0)
+			_board_derivation(id, worker)
 
 
 func _start(evaluation: Bodies.Evaluation) -> void:
@@ -321,14 +344,14 @@ func _start(evaluation: Bodies.Evaluation) -> void:
 		_evaluation_changed(Effects.EvaluationChanged.new(evaluation.id, "fetching"))
 
 
-func _board_derivation(derivation_build: String, worker: Bodies.Worker, score: float) -> void:
+func _board_derivation(derivation_build: String, worker: Bodies.Worker) -> void:
 	var live := _builds_of(derivation_build).filter(func(build: Bodies.Build): return not build.finished)
 	if live.is_empty():
 		return
 	var aboard := live.filter(func(build: Bodies.Build): return build.electron.host.begins_with("worker:"))
 	var carrier: Bodies.Build = aboard[0] if aboard else live[0]
 	if carrier.electron.host != worker_host(worker.id):
-		_board(carrier, worker, score)
+		_board(carrier, worker)
 
 
 func _builds_of(derivation_build: String) -> Array:
@@ -338,10 +361,34 @@ func _builds_of(derivation_build: String) -> Array:
 	return linked
 
 
-func _echo(job: Callable, worker: Callable, score: float) -> void:
-	var quality := maxf(score, 0.0) / (maxf(score, 0.0) + SCORE_HALF)
-	var answer := Echo.new(worker, job, Palette.ECHO_BAD.lerp(Palette.ECHO_GOOD, quality), 0.1 + 0.9 * quality, ECHO_TIME)
-	_spawn([Echo.new(job, worker, Palette.PING, 1.0, ECHO_TIME, func() -> void: _spawn([answer]))])
+func _offer(worker: Bodies.Worker) -> void:
+	var offer := Bodies.Offer.new()
+	offers[worker.id] = offer
+	var arrive := func() -> void:
+		offer.arrived = true
+		_reflect(worker)
+	_spawn([Shockwave.new(server_position, Palette.PING, worker.position.distance_to(server_position()), SHOCK_TIME, arrive)])
+
+
+func _answer(worker: Bodies.Worker) -> void:
+	if offers.has(worker.id):
+		offers[worker.id].answered = true
+		_reflect(worker)
+
+
+func _reflect(worker: Bodies.Worker) -> void:
+	var offer: Bodies.Offer = offers.get(worker.id)
+	if not offer or not offer.arrived or not offer.answered:
+		return
+	offers.erase(worker.id)
+	var at_worker := func() -> Vector3: return worker.position
+	var distance := worker.position.distance_to(server_position())
+	if offer.score == null:
+		_spawn([Shockwave.new(at_worker, Palette.PING, distance, SHOCK_TIME, Callable(), server_position, 0.3)])
+		return
+	var quality: float = maxf(offer.score, 0.0) / (maxf(offer.score, 0.0) + SCORE_HALF)
+	var color := Palette.ECHO_BAD.lerp(Palette.ECHO_GOOD, quality)
+	_spawn([Shockwave.new(at_worker, color, distance, SHOCK_TIME, Callable(), server_position, 0.1 + 0.9 * quality)])
 
 
 func _send_home(evaluation: Bodies.Evaluation) -> void:
@@ -351,7 +398,9 @@ func _send_home(evaluation: Bodies.Evaluation) -> void:
 
 func _send_build_home(evaluation: Bodies.Evaluation, build: Bodies.Build) -> void:
 	var host := evaluation_host(evaluation.id)
-	if build.electron.host != host:
+	if build.finished:
+		build.electron.jump(host, _follow(evaluation.electron), Orbit.new(0.0, 0.0, 0.0, 0.0))
+	elif build.electron.host != host:
 		build.electron.jump(host, _follow(evaluation.electron), _build_orbit(build.index))
 
 
@@ -365,9 +414,10 @@ func _join(evaluation: Bodies.Evaluation, group: String) -> void:
 	evaluation.slot = slot
 
 
-func _pulse() -> void:
+func _pulse(kind: String) -> void:
 	core_flash = 1.0
-	_erupt()
+	if kind == "graph":
+		_erupt()
 
 
 static func flare_height() -> float:
@@ -401,10 +451,10 @@ func _cache_access(access: Effects.CacheAccess) -> void:
 	_spawn([Comet.new(func() -> Vector3: return cache.position, func() -> Vector3: return client, color, size, randf_range(0.6, 0.9), randf_range(-0.3, 0.3))])
 
 
-func _feed_caches(source: Callable) -> void:
-	for cache in caches.values():
-		var arrive := func() -> void: cache.flash = 1.0
-		_spawn([Comet.new(source, func() -> Vector3: return cache.position, Palette.STORE, 0.1, 1.3, randf_range(-0.2, 0.2), arrive)])
+func _store(cache_id: String) -> void:
+	var cache := _cache(cache_id)
+	var arrive := func() -> void: cache.flash = 1.0
+	_spawn([Comet.new(server_position, func() -> Vector3: return cache.position, Palette.STORE, 0.1, 1.3, randf_range(-0.2, 0.2), arrive)])
 
 
 func _query_caches() -> void:
@@ -423,10 +473,10 @@ func _cache(cache_id: String) -> Bodies.Cache:
 func _place_caches() -> void:
 	var ids := caches.keys()
 	ids.sort()
-	var spacing := minf(8.0, 70.0 / (ids.size() + 1))
+	var radius := maxf(CACHE_ARC, CACHE_SPACING * (ids.size() + 1) / PI)
 	for index in ids.size():
-		var offset := index - (ids.size() - 1) / 2.0
-		caches[ids[index]].position = Vector3(offset * spacing, CACHE_HEIGHT, CACHE_DEPTH)
+		var angle := PI * (index + 1) / (ids.size() + 1)
+		caches[ids[index]].position = CACHE_ARC_CENTER + Vector3(-cos(angle), 0.0, -sin(angle)) * radius
 
 
 func _worker(worker_id: String) -> Bodies.Worker:
@@ -443,9 +493,8 @@ func _worker(worker_id: String) -> Bodies.Worker:
 func _evaluation(evaluation_id: String) -> Bodies.Evaluation:
 	if not evaluations.has(evaluation_id):
 		var slot := _lane(evaluation_id)
-		var label := UNASSIGNED if evaluation_id == UNASSIGNED else evaluation_id.substr(0, 8)
 		var electron := Electron.new(SERVER, server_position, _server_orbit(slot, evaluation_id), server_position(), 0.0)
-		evaluations[evaluation_id] = Bodies.Evaluation.new(evaluation_id, label, slot, evaluation_id, electron, time)
+		evaluations[evaluation_id] = Bodies.Evaluation.new(evaluation_id, evaluation_id.substr(0, 8), slot, evaluation_id, electron, time)
 	return evaluations[evaluation_id]
 
 
@@ -527,6 +576,14 @@ func _update_evaluations(dt: float) -> void:
 		for build in evaluation.builds.values():
 			build.flash *= pow(0.1, dt)
 			build.electron.update(dt)
+			_absorb(evaluation, build)
+
+
+func _absorb(evaluation: Bodies.Evaluation, build: Bodies.Build) -> void:
+	if build.absorbed or not build.finished or build.incoming or build.electron.hop < 1.0 or build.electron.orbit.radius > 0.0:
+		return
+	build.absorbed = true
+	evaluation.flash = maxf(evaluation.flash, 0.6)
 
 
 func _retire(evaluation: Bodies.Evaluation) -> void:

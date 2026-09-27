@@ -25,6 +25,15 @@ class WorkerLoad:
 		cpu = p_cpu
 
 
+class WorkerNetwork:
+	var worker_id: String
+	var mbps: Variant
+
+	func _init(p_worker_id: String, p_mbps: Variant) -> void:
+		worker_id = p_worker_id
+		mbps = p_mbps
+
+
 class EvaluationChanged:
 	var evaluation_id: String
 	var phase: String
@@ -85,7 +94,10 @@ class CacheAccess:
 
 
 class CacheStored:
-	pass
+	var cache_id: String
+
+	func _init(p_cache_id: String) -> void:
+		cache_id = p_cache_id
 
 
 class CacheQueried:

@@ -128,7 +128,7 @@ func _build_banner() -> void:
 
 func draw(world: World, transmission: Transmission, camera: Camera3D) -> void:
 	_detections.track(world, camera)
-	_telemetry.show_readout(transmission.telemetry(Time.get_unix_time_from_system()), transmission.glitch > Transmission.DEGRADED)
+	_telemetry.show_readout(transmission.telemetry(Time.get_unix_time_from_system(), world.average_network()), transmission.glitch > Transmission.DEGRADED)
 	_fill(_headlines, world.headlines, world.time, HEADLINE_FADE, Palette.tone, world.describe)
 	_fill(_messages, world.messages, world.time, MESSAGE_FADE, Palette.message, world.describe)
 	if _banner:

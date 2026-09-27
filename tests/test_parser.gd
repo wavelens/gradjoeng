@@ -83,6 +83,16 @@ func test_worker_metrics_carry_cpu_usage() -> void:
 	equal(EventParser.parse(ev("worker.metrics", {"worker_id": "w1", "cpu_usage_pct": null}))[0].cpu, null)
 
 
+func test_skipped_build_status_is_known() -> void:
+	equal(EventParser.parse(ev("build.status_changed", {"build_id": "b1", "evaluation_id": "e1", "status": 10}))[0].state, "skipped")
+
+
+func test_worker_network_carries_mbps() -> void:
+	var network: Effects.WorkerNetwork = only(EventParser.parse(ev("worker.network", {"worker_id": "w1", "network_speed_mbps": 12.5})))
+	equal([network.worker_id, network.mbps], ["w1", 12.5])
+	equal(EventParser.parse(ev("worker.network", {"worker_id": "w1", "network_speed_mbps": null}))[0].mbps, null)
+
+
 func test_graph_and_cache_pulse_the_server() -> void:
 	equal(only(EventParser.parse(ev("graph.requeued", {"requeued": 0.0}))).kind, "graph")
 	equal(EventParser.parse(ev("graph.ingested", {"evaluation_id": "e1"}))[0].kind, "graph")
@@ -95,8 +105,13 @@ func test_cache_events_address_their_cache() -> void:
 	equal(EventParser.parse(ev("cache.nar.fetched", {"cache": "c1", "size": 96941.0}))[0].size, 96941)
 
 
-func test_committed_nar_is_stored_in_caches() -> void:
-	check(EventParser.parse(ev("graph.nar_committed", {"created": true})).any(func(effect): return effect is Effects.CacheStored))
+func test_signed_nar_is_stored_in_its_cache() -> void:
+	var stored: Effects.CacheStored = only(EventParser.parse(ev("cache.nar.signed", {"cache": "c1", "hash": "abc"})))
+	equal(stored.cache_id, "c1")
+
+
+func test_committed_nar_names_no_cache() -> void:
+	check(not EventParser.parse(ev("graph.nar_committed", {"created": true})).any(func(effect): return effect is Effects.CacheStored), "caches come from cache.nar.signed")
 
 
 func test_unknown_events_become_headlines() -> void:

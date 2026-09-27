@@ -3,10 +3,11 @@ extends Suite
 
 func test_orbit_is_a_tilted_circle_in_3d() -> void:
 	var orbit := Orbit.new(2.0, 0.5, 0.3, 1.0)
-	for point in orbit.path(16):
+	var points := range(16).map(func(i): return orbit.offset(i * TAU / 16))
+	for point in points:
 		near(point.length(), 2.0, 1e-4, "radius")
 		near(point.dot(orbit.normal), 0.0, 1e-4, "in plane")
-	check(Array(orbit.path(16)).any(func(p): return absf(p.y) > 0.5), "inclined orbits leave the ground plane")
+	check(points.any(func(p): return absf(p.y) > 0.5), "inclined orbits leave the ground plane")
 
 
 func test_flat_orbit_stays_in_ground_plane() -> void:
@@ -40,3 +41,10 @@ func test_electron_jump_starts_from_current_position_and_can_hold() -> void:
 	check(electron.position.is_equal_approx(start), "holds before hopping")
 	electron.update(Electron.HOP_TIME + 0.2)
 	check(electron.position.is_equal_approx(Vector3(10.2, 0, 0)), "lands on new orbit")
+
+
+func test_frame_maps_the_unit_ring_onto_the_orbit() -> void:
+	var orbit := Orbit.new(3.0, 0.4, 1.1, 0.5)
+	for angle in [0.0, 1.0, 2.5, 4.0]:
+		var on_ring: Vector3 = orbit.frame() * Vector3(cos(angle), 0.0, sin(angle))
+		check(on_ring.is_equal_approx(orbit.offset(angle)), "angle %s" % angle)

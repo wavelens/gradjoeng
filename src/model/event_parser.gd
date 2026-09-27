@@ -1,7 +1,7 @@
 class_name EventParser
 
 const EVALUATION_PHASES := ["queued", "evaluating", "evaluating", "building", "waiting", "completed", "failed", "aborted", "fetching"]
-const BUILD_STATES := ["created", "queued", "building", "completed", "failed", "aborted", "dependency_failed", "substituted", "retrying", "timeout"]
+const BUILD_STATES := ["created", "queued", "building", "completed", "failed", "aborted", "dependency_failed", "substituted", "retrying", "timeout", "skipped"]
 const GOOD := ["completed", "substituted"]
 const BAD := ["failed", "dependency_failed", "timeout", "aborted"]
 
@@ -45,6 +45,11 @@ static func text(content: Dictionary, key: String) -> String:
 static func number(content: Dictionary, key: String) -> float:
 	var value: Variant = content.get(key)
 	return float(value) if value is float or value is int else 0.0
+
+
+static func optional_number(content: Dictionary, key: String) -> Variant:
+	var value: Variant = content.get(key)
+	return float(value) if value is float or value is int else null
 
 
 static func lookup(table: Array, code: Variant, fallback: String) -> String:
@@ -95,8 +100,9 @@ static func _worker(name: String, content: Dictionary) -> Array:
 		"worker.queue_depth":
 			return []
 		"worker.metrics" when worker:
-			var cpu: Variant = content.get("cpu_usage_pct")
-			return [Effects.WorkerLoad.new(worker, float(cpu) if cpu is float or cpu is int else null)]
+			return [Effects.WorkerLoad.new(worker, optional_number(content, "cpu_usage_pct"))]
+		"worker.network" when worker:
+			return [Effects.WorkerNetwork.new(worker, optional_number(content, "network_speed_mbps"))]
 		"worker.job_dispatched" when worker:
 			return [
 				Effects.JobDispatched.new(worker, text(content, "evaluation_id"), text(content, "build_id"), number(content, "score")),
@@ -109,8 +115,6 @@ static func _graph(name: String, content: Dictionary) -> Array:
 	var pulse := Effects.ServerPulse.new("graph")
 	if name == "graph.requeued" and not content.get("requeued"):
 		return [pulse]
-	if name == "graph.nar_committed":
-		return [pulse, Effects.CacheStored.new(), Effects.Headline.new(name, "info")]
 	return [pulse, Effects.Headline.new(name, "info")]
 
 
@@ -126,4 +130,6 @@ static func _cache(name: String, content: Dictionary) -> Array:
 	var cache := text(content, "cache")
 	if not cache:
 		return [Effects.ServerPulse.new("cache")]
+	if name == "cache.nar.signed":
+		return [Effects.CacheStored.new(cache)]
 	return [Effects.CacheAccess.new(cache, name.get_slice(".", 1), content.get("hit", true), int(number(content, "size")))]

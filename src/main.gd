@@ -57,6 +57,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_MINUS, KEY_KP_SUBTRACT:
 			if clock:
 				clock.shift_speed(-1)
+		KEY_F11:
+			var fullscreen := get_window().mode == Window.MODE_FULLSCREEN
+			get_window().mode = Window.MODE_WINDOWED if fullscreen else Window.MODE_FULLSCREEN
 		KEY_Q, KEY_ESCAPE:
 			get_tree().quit()
 
@@ -87,4 +90,4 @@ func _on_event(event: Dictionary) -> void:
 	for effect in EventParser.parse(event):
 		world.apply(effect)
 		if effect is Effects.WorkerMessage:
-			transmission.interfere()
+			transmission.receive(effect.size)

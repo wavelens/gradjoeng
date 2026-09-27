@@ -1,7 +1,7 @@
 class_name WorldView
 extends Node3D
 ## Redraws the whole world every frame around a shader-driven sun: additive billboards for glows and rings,
-## cel-shaded discs with depth for bodies, camera-facing ribbons for trails, orbits and flares.
+## cel-shaded discs with depth for bodies, camera-facing ribbons for trails, and shader-bent strips for orbits, links and flares.
 
 const GLOW_SHADER := preload("res://src/shaders/glow.gdshader")
 const BODY_SHADER := preload("res://src/shaders/body.gdshader")
@@ -12,12 +12,16 @@ const CHROMOSPHERE_SHADER := preload("res://src/shaders/chromosphere.gdshader")
 const SKY_SHADER := preload("res://src/shaders/sky.gdshader")
 const PROMINENCE_SHADER := preload("res://src/shaders/prominence.gdshader")
 const LENS_SHADER := preload("res://src/shaders/lens.gdshader")
+const ORBIT_SHADER := preload("res://src/shaders/orbit.gdshader")
+const LINK_SHADER := preload("res://src/shaders/link.gdshader")
 const STRANDS := [1.0, 0.93, 1.05, 0.88]
 const GLOW_LEVELS := [0.0, 0.3, 0.3, 0.1, 0.0, 0.0, 0.0]
 
 const GLOW := Color(0, 0, 0, 0)
 const RING := 1.0
 const ORBIT_SEGMENTS := 128
+const FLARE_SEGMENTS := 32
+const ORBIT_WIDTH := 0.05
 const WORKER_RADIUS := 1.2
 const EVALUATION_RADIUS := 0.36
 const BUILD_RADIUS := 0.17
@@ -26,17 +30,21 @@ const SUNLIGHT := Color("ff6a3d")
 const RIM_REACH := 1.08
 const LINK_LANE := 0.085
 const LINK_PACKETS := 40
-const LINK_DASH := 0.3
-const LINK_SPEED := 7.5
+const SHOCK_WIDTH := 0.35
 const CACHE_DASH := 0.6
 const CACHE_GAP := 0.4
 const LABEL := Color("e6e6f5")
+const CACHE_TEXT := 1.6
+const EVALUATION_TEXT := 1.5
+const WORKER_TEXT := 1.6
 
 var glows := SpriteBatch.new(GLOW_SHADER)
 var bodies := SpriteBatch.new(BODY_SHADER)
 var planets := SpriteBatch.new(PLANET_SHADER)
 var ribbons := RibbonBatch.new(RIBBON_SHADER)
-var prominences := RibbonBatch.new(PROMINENCE_SHADER)
+var links := RibbonBatch.new(LINK_SHADER)
+var orbits := SpriteBatch.new(ORBIT_SHADER, SpriteBatch.strip(ORBIT_SEGMENTS))
+var prominences := SpriteBatch.new(PROMINENCE_SHADER, SpriteBatch.strip(FLARE_SEGMENTS))
 var labels := LabelPool.new()
 var sun := MeshInstance3D.new()
 var chromosphere := MeshInstance3D.new()
@@ -46,7 +54,9 @@ var eye := Vector3.ZERO
 
 
 func _ready() -> void:
-	for child in [_environment(), _lens(), _sun(), _sunlight(), _chromosphere(), prominences, ribbons, glows, bodies, planets, labels]:
+	prominences.material_override.set_shader_parameter("radius", World.SUN_RADIUS)
+	links.material_override.set_shader_parameter("spacing", World.WORKER_RING / LINK_PACKETS)
+	for child in [_environment(), _lens(), _sun(), _sunlight(), _chromosphere(), prominences, orbits, links, ribbons, glows, bodies, planets, labels]:
 		add_child(child)
 
 
@@ -62,11 +72,14 @@ func draw(world: World, p_eye: Vector3) -> void:
 	bodies.begin()
 	planets.begin()
 	ribbons.begin(eye)
-	prominences.begin(eye)
+	links.begin(eye)
+	orbits.begin()
+	prominences.begin()
 	labels.begin()
 	_links(world)
 	_orbits(world)
 	_ripples(world)
+	_shockwaves(world)
 	_comets(world)
 	_echoes(world)
 	_server(world)
@@ -78,6 +91,8 @@ func draw(world: World, p_eye: Vector3) -> void:
 	bodies.commit()
 	planets.commit()
 	ribbons.commit()
+	links.commit()
+	orbits.commit()
 	prominences.commit()
 	labels.commit()
 
@@ -155,24 +170,24 @@ func _material(shader: Shader) -> ShaderMaterial:
 
 
 func _links(world: World) -> void:
+	links.material_override.set_shader_parameter("time", world.time)
 	for worker in world.workers.values():
-		_link(world, World.server_position(), worker.position, 0.5 + worker.heat)
+		_link(World.server_position(), worker.position, 0.5 + worker.heat)
 
 
-func _link(world: World, start: Vector3, end: Vector3, energy: float) -> void:
+func _link(start: Vector3, end: Vector3, energy: float) -> void:
 	var span := end - start
-	var length := maxf(span.length(), 0.01)
+	var length := span.length()
 	var side := span.cross(Vector3.UP).normalized() * LINK_LANE
 	var base := Palette.shade(Palette.LINK, 0.5 * energy)
+	var rail := Palette.shade(Palette.LINK, 1.0 * energy)
+	var packet := Palette.shade(Palette.LINK_PACKET, 0.08 + 0.12 * energy)
 	ribbons.segment(start, end, base, base, LINK_LANE * 2.0)
 	for direction in [-1, 1]:
-		var lane := func(t: float) -> Vector3: return start + span * t + side * direction
-		var rail := Palette.shade(Palette.LINK, 1.0 * energy)
-		ribbons.segment(lane.call(0.0), lane.call(1.0), rail, rail, 0.015)
-		for i in LINK_PACKETS:
-			var flow := fposmod(float(i) / LINK_PACKETS + world.time * LINK_SPEED * direction / length, 1.0)
-			var packet := Palette.shade(Palette.LINK_PACKET, 0.08 + 0.12 * energy)
-			ribbons.segment(lane.call(flow), lane.call(minf(flow + LINK_DASH / length, 1.0)), packet, packet, 0.035)
+		var from: Vector3 = start + side * direction
+		var to: Vector3 = end + side * direction
+		ribbons.segment(from, to, rail, rail, 0.015)
+		links.segment(from, to, packet, packet, 0.035, -1.0, Vector2(0.0, length) if direction > 0 else Vector2(length, 0.0))
 
 
 func _orbits(world: World) -> void:
@@ -185,11 +200,7 @@ func _orbits(world: World) -> void:
 
 
 func _orbit_ring(electron: Electron, color: Color) -> void:
-	var center: Vector3 = electron.anchor.call()
-	var points := electron.orbit.path(ORBIT_SEGMENTS)
-	for i in points.size():
-		points[i] += center
-	ribbons.strip(points, color, 0.05, true)
+	orbits.add_frame(electron.orbit.frame(), electron.anchor.call(), color, Color(ORBIT_WIDTH, 0, 0, 0))
 
 
 func _ripples(world: World) -> void:
@@ -197,6 +208,24 @@ func _ripples(world: World) -> void:
 		if ripple is Ripple and ripple.current_radius > ripple.width:
 			var width := minf(ripple.width / ripple.current_radius, 0.5)
 			glows.add(ripple.anchor.call(), ripple.current_radius, Color(ripple.color, ripple.fade), Color(RING, width, 0, 0))
+
+
+func _shockwaves(world: World) -> void:
+	for wave in world.fx:
+		if not wave is Shockwave or wave.radius <= SHOCK_WIDTH:
+			continue
+		if wave.toward.is_valid():
+			_fading_arc(wave.arc(), Color(wave.color, wave.fade * wave.strength), SHOCK_WIDTH * (0.5 + wave.strength))
+		else:
+			orbits.add_frame(Basis.from_scale(Vector3(wave.radius, 1.0, wave.radius)), wave.anchor.call(), Color(wave.color, wave.fade * 0.5), Color(SHOCK_WIDTH, 0, 0, 0))
+
+
+func _fading_arc(points: PackedVector3Array, color: Color, width: float) -> void:
+	var last := points.size() - 1
+	for i in last:
+		var from := Color(color, color.a * sin(PI * i / last))
+		var to := Color(color, color.a * sin(PI * (i + 1) / last))
+		ribbons.segment(points[i], points[i + 1], from, to, width)
 
 
 func _comets(world: World) -> void:
@@ -223,10 +252,11 @@ func _server(world: World) -> void:
 	chromosphere.material_override.set_shader_parameter("energy", 1.0 + world.core_flash * 0.3)
 	for flare in world.fx:
 		if flare is Flare:
+			var frame: Basis = flare.frame()
+			var width := clampf(flare.height * 0.12, 0.06, 0.35)
 			for strand in STRANDS.size():
 				var seed := float(flare.get_instance_id() % 97 + strand * 31) / 128.0
-				var width := clampf(flare.height * 0.12, 0.06, 0.35)
-				prominences.strip(flare.points(32, STRANDS[strand]), Color(0, 0, seed, flare.fade), width)
+				prominences.add_frame(frame, Vector3.ZERO, Color(0, 0, seed, flare.fade), Color(flare.spread, flare.lifted(STRANDS[strand]), width, 0))
 
 
 func _caches(world: World) -> void:
@@ -235,9 +265,9 @@ func _caches(world: World) -> void:
 		ribbons.dashed(World.server_position(), cache.position, link, 0.025, CACHE_DASH, CACHE_GAP)
 		_satellite(cache.id).place(cache.position, world.time, cache.flash, cache.alarm)
 		var age: float = world.time - cache.born
-		labels.show_text(Detection.decoded(world.cache_label(cache), age, hash(cache.id)), cache.position + Vector3.DOWN * 1.6, Palette.CACHE.lightened(0.3))
+		labels.show_text(Detection.decoded(world.cache_label(cache), age, hash(cache.id)), cache.position + Vector3.DOWN * 2.0, Palette.CACHE.lightened(0.3), CACHE_TEXT)
 		var stats := "hit %d  miss %d  %.1f MB" % [cache.hits, cache.misses, cache.served / 1e6]
-		labels.show_text(Detection.decoded(stats, age - 0.15, hash(stats.length())), cache.position + Vector3.DOWN * 2.3, Palette.CACHE.lightened(0.1), 0.75)
+		labels.show_text(Detection.decoded(stats, age - 0.15, hash(stats.length())), cache.position + Vector3.DOWN * 3.0, Palette.CACHE.lightened(0.1), CACHE_TEXT * 0.8)
 
 
 func _satellite(cache_id: String) -> Satellite:
@@ -262,7 +292,7 @@ func _workers(world: World) -> void:
 		var label := world.worker_label(worker)
 		if worker.cpu != null:
 			label += "  %d%%" % roundi(worker.cpu)
-		labels.show_text(Detection.decoded(label, world.time - worker.born, hash(worker.id)), at + Vector3.UP * (WORKER_RADIUS + 0.7), color)
+		labels.show_text(Detection.decoded(label, world.time - worker.born, hash(worker.id)), at + Vector3.UP * (WORKER_RADIUS + 0.9), color, WORKER_TEXT)
 
 
 func _evaluations(world: World) -> void:
@@ -274,8 +304,8 @@ func _evaluations(world: World) -> void:
 		glows.add(at, 0.48 + evaluation.flash * 0.68, Palette.shade(color, alpha * (0.6 + evaluation.flash * 0.8)))
 		bodies.add(at, EVALUATION_RADIUS, Color(color, alpha), Color(0.28, 0, 0, 0))
 		var age: float = world.time - evaluation.born
-		labels.show_text(Detection.decoded(evaluation.label, age, hash(evaluation.label)), at + Vector3.UP * 0.85, Color(LABEL, alpha))
-		labels.show_text(Detection.decoded(evaluation.phase, age - 0.15, hash(evaluation.phase)), at + Vector3.DOWN * 0.8, Color(color, alpha), 0.8)
+		labels.show_text(Detection.decoded(evaluation.label, age, hash(evaluation.label)), at + Vector3.UP * 1.05, Color(LABEL, alpha), EVALUATION_TEXT)
+		labels.show_text(Detection.decoded(evaluation.phase, age - 0.15, hash(evaluation.phase)), at + Vector3.DOWN * 0.95, Color(color, alpha), EVALUATION_TEXT * 0.8)
 		for build in evaluation.visible_builds():
 			_build(build, alpha)
 

@@ -1,8 +1,8 @@
 shader_type canvas_item;
 
 uniform sampler2D screen : hint_screen_texture, filter_linear_mipmap, repeat_disable;
-uniform float distortion = 0.14;
-uniform float dispersion = 0.022;
+uniform float distortion = 0.08;
+uniform float dispersion = 0.007;
 uniform float vignette = 0.75;
 uniform float grain = 0.045;
 uniform float scanlines = 0.08;

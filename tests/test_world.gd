@@ -65,8 +65,46 @@ func test_evaluation_lifecycle_retires_after_linger() -> void:
 	check(not world.evaluations.has("e1"), "retired")
 
 
+func test_builds_of_unannounced_evaluations_spawn_no_sphere() -> void:
+	var world := World.new()
+	for state in ["created", "queued", "building", "completed"]:
+		world.apply(Effects.BuildChanged.new("b1", "older-eval", state, "d1"))
+	world.apply(Effects.BuildChanged.new("b2", "", "queued", "d2"))
+	check(world.evaluations.is_empty(), "no phantom evaluations: %s" % [world.evaluations.keys()])
+
+
+func test_idle_evaluation_despawns_after_30_seconds() -> void:
+	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(Effects.BuildChanged.new("b1", "e1", "queued"))
+	step(world, 29.0, 1.0)
+	check(world.evaluations.has("e1") and world.evaluations["e1"].alpha == 1.0, "still shown")
+	step(world, 1.0 + World.EVAL_FADE + 0.5, 0.5)
+	check(not world.evaluations.has("e1"), "despawned")
+
+
+func test_finished_builds_fall_into_their_evaluation() -> void:
+	for state in ["completed", "substituted", "failed", "dependency_failed", "aborted", "timeout", "skipped"]:
+		var world := World.new()
+		world.apply(queued("e1"))
+		world.apply(Effects.BuildChanged.new("b1", "e1", "queued", "d1"))
+		world.apply(Effects.BuildChanged.new("b2", "e1", "queued", "d2"))
+		world.apply(Effects.JobDispatched.new("w1", "e1", "d1"))
+		world.apply(Effects.BuildChanged.new("b1", "e1", "building", "d1"))
+		step(world, 2.0)
+		world.apply(Effects.BuildChanged.new("b1", "e1", state, "d1"))
+		var evaluation: Bodies.Evaluation = world.evaluations["e1"]
+		step(world, 3.0)
+		var build: Bodies.Build = evaluation.builds["b1"]
+		equal(build.electron.host, World.evaluation_host("e1"), state)
+		near(build.position.distance_to(evaluation.position), 0.0, 0.01, state)
+		check(build.absorbed, "%s absorbed" % state)
+		equal(evaluation.visible_builds().map(func(b): return b.id), ["b2"], state)
+
+
 func test_stale_evaluation_retires() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "created"))
 	world.update(World.EVAL_STALE / 2)
 	world.apply(Effects.BuildChanged.new("b1", "e1", "queued"))
@@ -86,6 +124,7 @@ func test_evaluation_slots_are_reused() -> void:
 
 func test_build_failure_shakes_once() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "building"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "failed"))
 	var sparks := fx_of(world, Spark).size()
@@ -97,6 +136,7 @@ func test_build_failure_shakes_once() -> void:
 
 func test_build_without_evaluation_uses_known_owner() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "queued"))
 	world.apply(Effects.BuildChanged.new("b1", "", "completed"))
 	equal(world.evaluations["e1"].builds["b1"].state, "completed")
@@ -114,6 +154,7 @@ func test_evaluation_electron_orbits_server_then_hops_to_worker_and_back() -> vo
 
 func test_build_electron_hops_to_worker_and_back() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "queued", "d1"))
 	var build: Bodies.Build = world.evaluations["e1"].builds["b1"]
 	equal(build.electron.host, "evaluation:e1")
@@ -126,6 +167,9 @@ func test_build_electron_hops_to_worker_and_back() -> void:
 
 func test_shared_derivation_build_sends_one_build_to_the_worker() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(queued("e2"))
+	world.apply(queued("e3"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "queued", "d1"))
 	world.apply(Effects.JobDispatched.new("w1", "e1", "d1"))
 	world.apply(Effects.BuildChanged.new("b2", "e2", "building", "d1"))
@@ -138,6 +182,8 @@ func test_shared_derivation_build_sends_one_build_to_the_worker() -> void:
 
 func test_shared_derivation_build_redispatch_moves_the_same_build() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(queued("e2"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "building", "d1"))
 	world.apply(Effects.BuildChanged.new("b2", "e2", "building", "d1"))
 	world.apply(Effects.JobDispatched.new("w1", "e1", "d1"))
@@ -149,6 +195,7 @@ func test_shared_derivation_build_redispatch_moves_the_same_build() -> void:
 
 func test_finished_builds_do_not_board_on_dispatch() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "completed", "d1"))
 	world.apply(Effects.JobDispatched.new("w1", "e2", "d1"))
 	equal(world.evaluations["e1"].builds["b1"].electron.host, "evaluation:e1")
@@ -156,6 +203,7 @@ func test_finished_builds_do_not_board_on_dispatch() -> void:
 
 func test_finished_evaluation_calls_its_builds_home() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "building", "d1"))
 	world.apply(Effects.JobDispatched.new("w1", "e1", "d1"))
 	world.apply(Effects.EvaluationChanged.new("e1", "aborted"))
@@ -164,6 +212,7 @@ func test_finished_evaluation_calls_its_builds_home() -> void:
 
 func test_worker_orbits_are_shelled_and_stay_near_the_worker() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	for build in ["b0", "b1", "b2", "b3", "b4"]:
 		world.apply(Effects.BuildChanged.new(build, "e1", "queued", "d" + build))
 		world.apply(Effects.JobDispatched.new("w1", "e1", "d" + build))
@@ -178,7 +227,7 @@ func test_electrons_settle_on_their_host_orbit() -> void:
 	var world := World.new()
 	world.apply(queued("e1"))
 	world.apply(Effects.JobDispatched.new("w1", "e1", ""))
-	step(world, 2.0)
+	step(world, 3.0)
 	var evaluation: Bodies.Evaluation = world.evaluations["e1"]
 	near(evaluation.position.distance_to(world.workers["w1"].position), evaluation.electron.orbit.radius, 0.05)
 
@@ -195,7 +244,8 @@ func test_evaluations_orbit_inside_the_worker_ring() -> void:
 
 func test_evaluation_build_orbits_hug_evaluation() -> void:
 	var world := World.new()
-	world.apply(Effects.BuildChanged.new("b1", "e1", "completed"))
+	world.apply(queued("e1"))
+	world.apply(Effects.BuildChanged.new("b1", "e1", "queued"))
 	var radius: float = world.evaluations["e1"].builds["b1"].electron.orbit.radius
 	check(radius >= 0.5 and radius < 0.9, "build orbit radius %s" % radius)
 
@@ -243,43 +293,121 @@ func test_cache_miss_raises_the_alarm_and_hits_do_not() -> void:
 	check(world.caches["c1"].alarm < 0.05, "alarm decays")
 
 
-func test_caches_sit_apart_above_the_server() -> void:
+func test_caches_lie_on_a_flat_half_circle_above_the_server() -> void:
+	for count in [1, 3, 12]:
+		var world := World.new()
+		for i in count:
+			world.apply(Effects.CacheAccess.new("c%02d" % i, "narinfo", true, 0))
+		var ids := world.caches.keys()
+		ids.sort()
+		var positions := ids.map(func(id): return world.caches[id].position)
+		var radius: float = positions[0].distance_to(World.CACHE_ARC_CENTER)
+		for i in count:
+			near(positions[i].y, World.CACHE_ARC_CENTER.y, 1e-3, "flat")
+			near(positions[i].distance_to(World.CACHE_ARC_CENTER), radius, 1e-3, "on the arc")
+			check(positions[i].z < World.CACHE_ARC_CENTER.z, "behind the server")
+			if i > 0:
+				check(positions[i].distance_to(positions[i - 1]) >= World.CACHE_SPACING * 0.95, "spaced: %s" % positions[i].distance_to(positions[i - 1]))
+		check(World.CACHE_ARC_CENTER.y > World.SUN_RADIUS + 3.0, "above the sun")
+
+
+func test_stored_nar_flies_from_server_into_its_cache_only() -> void:
 	var world := World.new()
-	for cache in ["c1", "c2", "c3"]:
-		world.apply(Effects.CacheAccess.new(cache, "narinfo", true, 0))
-	var xs := world.caches.values().map(func(c): return c.position.x)
-	check(xs[0] != xs[1] and xs[1] != xs[2], "apart")
-	check(world.caches.values().all(func(c): return c.position.y > World.SUN_RADIUS + 3.0), "above the sun")
+	world.apply(Effects.CachesListed.new({"c1": "main", "c2": "mirror"}))
+	world.apply(Effects.CacheStored.new("c2"))
+	var comets := fx_of(world, Comet)
+	equal(comets.size(), 1)
+	equal(comets[0].source.call(), World.server_position())
+	equal(comets[0].target.call(), world.caches["c2"].position)
 
 
-func test_stored_nar_flies_from_server_into_every_cache() -> void:
+func offer(world: World, worker: String = "w1") -> void:
+	world.apply(Effects.WorkerMessage.new(worker, true, "job_offer", 151))
+	world.update(World.MESSAGE_GAP)
+
+
+func answer(world: World, worker: String = "w1") -> void:
+	world.apply(Effects.WorkerMessage.new(worker, false, "request_job_chunk", 0))
+	world.update(World.MESSAGE_GAP)
+
+
+func test_job_offer_sends_a_shockwave_from_the_server_to_the_worker() -> void:
 	var world := World.new()
-	world.apply(Effects.CacheStored.new())
-	check(fx_of(world, Comet).is_empty(), "no caches, no comets")
-	world.apply(Effects.CacheAccess.new("c1", "narinfo", true, 0))
-	world.apply(Effects.CacheAccess.new("c2", "narinfo", true, 0))
-	var before := fx_of(world, Comet).size()
-	world.apply(Effects.CacheStored.new())
-	equal(fx_of(world, Comet).size(), before + 2)
+	offer(world)
+	var waves := fx_of(world, Shockwave)
+	equal(waves.size(), 1)
+	equal(waves[0].anchor.call(), World.server_position())
+	near(waves[0].reach, world.workers["w1"].position.length(), 0.01)
+	check(fx_of(world, Comet).is_empty(), "scoring rides the wave, not a comet")
 
 
-func returned_echo(score: float) -> Echo:
+func reflections(world: World) -> Array:
+	return fx_of(world, Shockwave).filter(func(wave): return wave.toward.is_valid())
+
+
+func test_worker_reflects_only_once_its_scores_come_in() -> void:
+	var world := World.new()
+	offer(world)
+	step(world, World.SHOCK_TIME + 0.1)
+	check(reflections(world).is_empty(), "no scores, no reflection")
+	answer(world)
+	var waves := reflections(world)
+	equal(waves.size(), 1)
+	equal(waves[0].anchor.call(), world.workers["w1"].position)
+	equal(waves[0].toward.call(), World.server_position())
+	near(waves[0].reach, world.workers["w1"].position.length(), 0.01)
+
+
+func test_reflection_is_an_eighth_circle_facing_the_server() -> void:
+	var worker := Vector3(40, 0, 0)
+	var wave := Shockwave.new(func() -> Vector3: return worker, Color.WHITE, 40.0, 1.0, Callable(), World.server_position, 1.0)
+	wave.update(0.5)
+	var arc := wave.arc(8)
+	for point in arc:
+		near(point.distance_to(worker), 20.0, 1e-3, "on the front")
+		near(point.y, 0.0, 1e-4, "flat")
+	near(arc[0].direction_to(worker).angle_to(arc[arc.size() - 1].direction_to(worker)), PI / 4, 1e-3, "eighth circle")
+	near(arc[4].distance_to(World.server_position()), 20.0, 1e-3, "centred on the server")
+
+
+func test_early_scores_reflect_when_the_wave_arrives() -> void:
+	var world := World.new()
+	offer(world)
+	answer(world)
+	check(reflections(world).is_empty(), "wave still travelling")
+	step(world, World.SHOCK_TIME + 0.05, 0.01)
+	equal(reflections(world).size(), 1)
+
+
+func reflected_wave(score: float) -> Shockwave:
 	var world := World.new()
 	world.apply(queued("e1"))
+	offer(world)
+	answer(world)
 	world.apply(Effects.JobDispatched.new("w1", "e1", "", score))
-	var ping: Echo = fx_of(world, Echo)[0]
-	equal(ping.target.call(), world.workers["w1"].position)
-	world.update(ping.duration + 0.01)
-	var echo: Echo = fx_of(world, Echo)[0]
-	equal(echo.target.call(), world.evaluations["e1"].position)
-	return echo
+	step(world, World.SHOCK_TIME + 0.05, 0.01)
+	return reflections(world)[0]
 
 
-func test_dispatch_score_echoes_back_from_the_worker() -> void:
-	var good := returned_echo(3000.0)
-	var bad := returned_echo(20.0)
+func test_shockwave_expands_from_the_server_at_constant_speed() -> void:
+	var wave := Shockwave.new(World.server_position, Color.WHITE, 40.0, 1.0)
+	wave.update(0.5)
+	near(wave.radius, 20.0)
+	check(wave.update(0.6) == false, "done once it reaches the ring")
+
+
+func test_dispatch_score_shapes_the_reflection() -> void:
+	var good := reflected_wave(3000.0)
+	var bad := reflected_wave(20.0)
 	check(good.strength > 0.8 and bad.strength < 0.2, "strength by score")
 	check(good.color.g > good.color.r and bad.color.r > bad.color.g, "color by score")
+
+
+func test_dispatch_alone_sends_no_shockwave() -> void:
+	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(Effects.JobDispatched.new("w1", "e1", "", 500.0))
+	check(fx_of(world, Shockwave).is_empty(), "waves come from job offers")
 
 
 func test_evaluations_of_same_group_share_orbit_path_in_formation() -> void:
@@ -298,7 +426,7 @@ func test_evaluations_of_same_group_share_orbit_path_in_formation() -> void:
 func test_late_group_moves_evaluation_onto_group_orbit() -> void:
 	var world := World.new()
 	world.apply(queued("e1", "p1"))
-	world.apply(Effects.BuildChanged.new("b1", "e2", "queued"))
+	world.apply(queued("e2"))
 	world.apply(Effects.EvaluationChanged.new("e2", "", "", "p1"))
 	equal(world.evaluations["e2"].slot, world.evaluations["e1"].slot)
 	check(world.evaluations["e2"].electron.orbit.same_path(world.evaluations["e1"].electron.orbit), "joined group path")
@@ -315,6 +443,7 @@ func test_evaluation_returning_home_rejoins_group_orbit() -> void:
 
 func test_created_builds_are_hidden_until_they_progress() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "created"))
 	world.apply(Effects.BuildChanged.new("b2", "e1", "queued"))
 	equal(world.evaluations["e1"].visible_builds().map(func(b): return b.id), ["b2"])
@@ -322,6 +451,7 @@ func test_created_builds_are_hidden_until_they_progress() -> void:
 
 func test_substituted_build_arrives_on_comet_from_cache() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.CacheAccess.new("c1", "narinfo", true, 0))
 	world.fx.clear()
 	world.apply(Effects.BuildChanged.new("b1", "e1", "substituted"))
@@ -336,6 +466,7 @@ func test_substituted_build_arrives_on_comet_from_cache() -> void:
 
 func test_substituted_build_without_cache_falls_from_above() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "substituted"))
 	check((fx_of(world, Comet)[0].source.call() as Vector3).y > 20.0, "from the sky")
 
@@ -366,8 +497,26 @@ func test_banner_hides_on_nar_and_log_pushes() -> void:
 		equal(world.banner, 0.0, kind)
 
 
+func test_evaluation_on_a_worker_stays_while_it_evaluates() -> void:
+	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(Effects.JobDispatched.new("w1", "e1", ""))
+	world.apply(Effects.EvaluationChanged.new("e1", "evaluating"))
+	step(world, World.EVAL_STALE + World.EVAL_FADE + 5.0, 1.0)
+	check(world.evaluations.has("e1"), "evaluation stays while on the worker")
+
+
+func test_job_messages_keep_their_evaluation_awake() -> void:
+	var world := World.new()
+	world.apply(Effects.EvaluationChanged.new("e1", "building"))
+	step(world, World.EVAL_STALE - 1.0, 1.0)
+	world.apply(Effects.WorkerMessage.new("w1", false, "log_chunk", 10, "eval:e1"))
+	equal(world.evaluations["e1"].idle, 0.0)
+
+
 func test_building_build_keeps_evaluation_alive() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "building"))
 	step(world, World.EVAL_STALE + World.EVAL_FADE + 1.0, 1.0)
 	check(world.evaluations.has("e1"), "evaluation stays while building")
@@ -389,9 +538,19 @@ func test_finished_evaluation_ignores_late_job_message() -> void:
 
 func test_building_build_boards_worker_from_job_message() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "building", "d1"))
 	world.apply(Effects.WorkerMessage.new("w1", false, "job_update", 10, "build:d1"))
 	equal(world.evaluations["e1"].builds["b1"].electron.host, World.worker_host("w1"))
+
+
+func test_average_worker_network_ignores_workers_without_samples() -> void:
+	var world := World.new()
+	equal(world.average_network(), null)
+	world.apply(Effects.WorkerNetwork.new("w1", 10.0))
+	world.apply(Effects.WorkerNetwork.new("w2", 30.0))
+	world.apply(Effects.WorkerNetwork.new("w3", null))
+	equal(world.average_network(), 20.0)
 
 
 func test_worker_load_sets_cpu_and_overload_throws_sparks() -> void:
@@ -410,6 +569,7 @@ func test_worker_load_sets_cpu_and_overload_throws_sparks() -> void:
 
 func test_retired_evaluations_are_freed() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "completed"))
 	world.apply(Effects.EvaluationChanged.new("e1", "completed"))
 	var gone: WeakRef = weakref(world.evaluations["e1"])
@@ -440,6 +600,16 @@ func test_most_flares_stay_small_and_few_tower() -> void:
 	check(heights.filter(func(h): return h > World.SUN_RADIUS * 0.25).size() < 40, "towering flares are rare")
 
 
+func test_flare_frame_carries_the_arc_for_the_gpu() -> void:
+	var flare := Flare.new(Vector3(1, 2, 0.5), 7.0, 1.5, Color.RED, 5.0)
+	flare.update(3.0)
+	var arc := flare.points(4)
+	for i in arc.size():
+		var s := i / 4.0
+		var local := Vector3(1.0, (s - 0.5) * flare.spread, 0.0).normalized() * (flare.radius + sin(s * PI) * flare.lifted())
+		check((flare.frame() * local).is_equal_approx(arc[i]), "point %d" % i)
+
+
 func test_flare_footpoints_widen_with_height() -> void:
 	var low := Flare.new(Vector3.UP, 7.0, 0.3, Color.RED, 5.0)
 	var tall := Flare.new(Vector3.UP, 7.0, 3.0, Color.RED, 5.0)
@@ -447,6 +617,14 @@ func test_flare_footpoints_widen_with_height() -> void:
 		var arc := flare.points(8)
 		return arc[0].distance_to(arc[arc.size() - 1])
 	check(span.call(low) < span.call(tall), "tall loops stand on wider footpoints")
+
+
+func test_only_graph_events_erupt() -> void:
+	var world := World.new()
+	for effect in EventParser.parse({"event": "cache.nar.fetched", "content": {}}):
+		world.apply(effect)
+	check(world.core_flash > 0.0, "cache traffic still flashes the core")
+	check(fx_of(world, Flare).is_empty(), "no flare from cache traffic")
 
 
 func test_every_graph_event_erupts() -> void:
@@ -481,6 +659,26 @@ func test_resolved_names_label_bodies_and_replay_identification() -> void:
 	world.update(1.0)
 	world.apply(Effects.Names.new({"w1-abcdef1234": "builder-01"}))
 	equal(world.workers["w1-abcdef1234"].born, 5.0)
+
+
+func test_empty_messages_are_logged_without_size() -> void:
+	var world := World.new()
+	world.apply(Effects.WorkerMessage.new("w1", false, "request_job", 0))
+	equal(world.messages[0].text, "{0}  <-  request_job")
+
+
+func test_pushes_are_paced_by_a_coin_flip_of_zero_or_one_millisecond() -> void:
+	for kind in World.ACTIVITY:
+		var world := World.new()
+		var previous := 0.0
+		var gaps := {}
+		for i in 60:
+			world.apply(Effects.WorkerMessage.new("w1", false, kind, 10))
+			var next: float = world.pacing["w1"]
+			gaps[snappedf(next - previous, 1e-6)] = true
+			previous = next
+		equal(gaps.keys().filter(func(gap): return gap != 0.0 and gap != 0.001), [], kind)
+		equal(gaps.size(), 2, "%s uses both gaps" % kind)
 
 
 func test_worker_messages_are_logged_newest_first_and_capped() -> void:
@@ -530,13 +728,12 @@ func test_cache_query_pings_every_cache() -> void:
 	equal(targets, [world.caches["c1"].position, world.caches["c2"].position])
 
 
-func test_completed_build_feeds_every_cache() -> void:
+func test_completed_build_feeds_no_cache_by_itself() -> void:
 	var world := World.new()
+	world.apply(queued("e1"))
 	world.apply(Effects.CachesListed.new({"c1": "main"}))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "completed"))
-	var feed := fx_of(world, Comet).filter(func(comet): return comet.target.call() == world.caches["c1"].position)
-	equal(feed.size(), 1)
-	equal(feed[0].source.call(), world.evaluations["e1"].builds["b1"].position)
+	check(fx_of(world, Comet).is_empty(), "only cache.nar.signed feeds a cache")
 
 
 func test_dispatched_queued_evaluation_is_fetching() -> void:
@@ -577,8 +774,8 @@ func test_banner_shows_after_ten_minutes_without_nar_push_even_when_busy() -> vo
 func test_worker_messages_are_paced_per_worker() -> void:
 	var world := World.new()
 	for i in 3:
-		world.apply(Effects.WorkerMessage.new("w1", false, "log_chunk", 10))
-	world.apply(Effects.WorkerMessage.new("w2", false, "log_chunk", 10))
+		world.apply(Effects.WorkerMessage.new("w1", false, "job_update", 10))
+	world.apply(Effects.WorkerMessage.new("w2", false, "job_update", 10))
 	equal(world.messages.size(), 2)
 	world.update(World.MESSAGE_GAP)
 	equal(world.messages.size(), 3)
@@ -589,7 +786,7 @@ func test_worker_messages_are_paced_per_worker() -> void:
 func test_message_backlog_lag_is_bounded() -> void:
 	var world := World.new()
 	for i in 1000:
-		world.apply(Effects.WorkerMessage.new("w1", false, "log_chunk", 10))
+		world.apply(Effects.WorkerMessage.new("w1", false, "job_update", 10))
 	world.update(World.MESSAGE_LAG)
 	equal(world.messages.size(), World.MAX_MESSAGES)
 	check(world.backlog.is_empty(), "backlog drained")

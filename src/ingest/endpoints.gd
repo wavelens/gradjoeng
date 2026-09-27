@@ -2,6 +2,7 @@ class_name Endpoints
 
 const EVENTS_PATH := "api/v1/metrics/events"
 const WORKERS_PATH := "api/v1/board/workers"
+const NETWORK_PATH := "api/v1/board/network"
 
 
 static func api_url(base: String, path: String) -> String:
@@ -19,6 +20,10 @@ static func events_url(base: String) -> String:
 
 static func workers_url(base: String) -> String:
 	return api_url(base, WORKERS_PATH)
+
+
+static func network_url(base: String) -> String:
+	return api_url(base, NETWORK_PATH)
 
 
 static func bearer(token: String) -> PackedStringArray:

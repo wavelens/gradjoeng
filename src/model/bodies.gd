@@ -11,6 +11,7 @@ class Worker:
 	var heat := 1.0
 	var position := Vector3.ZERO
 	var cpu: Variant = null
+	var network: Variant = null
 	var born: float
 
 	var unstable: bool:
@@ -38,6 +39,12 @@ class Cache:
 		born = p_born
 
 
+class Offer:
+	var arrived := false
+	var answered := false
+	var score: Variant = null
+
+
 class Build:
 	var id: String
 	var derivation_build: String
@@ -46,6 +53,7 @@ class Build:
 	var electron: Electron
 	var flash := 1.0
 	var incoming := false
+	var absorbed := false
 
 	var position: Vector3:
 		get:
@@ -53,11 +61,11 @@ class Build:
 
 	var visible: bool:
 		get:
-			return state != "created" and not incoming
+			return state != "created" and not incoming and not absorbed
 
 	var finished: bool:
 		get:
-			return state in EventParser.GOOD or state in EventParser.BAD
+			return state in EventParser.GOOD or state in EventParser.BAD or state == "skipped"
 
 	func _init(p_id: String, p_index: int, p_electron: Electron) -> void:
 		id = p_id
@@ -88,7 +96,7 @@ class Evaluation:
 
 	var busy: bool:
 		get:
-			return builds.values().any(func(build: Build): return build.state == "building")
+			return electron.host.begins_with("worker:") or builds.values().any(func(build: Build): return build.state == "building")
 
 	func _init(p_id: String, p_label: String, p_slot: int, p_group: String, p_electron: Electron, p_born: float) -> void:
 		id = p_id

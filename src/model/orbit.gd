@@ -28,19 +28,16 @@ func advance(dt: float) -> void:
 	phase += speed * dt
 
 
+func frame() -> Basis:
+	return Basis(_u * radius, normal, _v * radius)
+
+
 func offset(angle: float) -> Vector3:
 	return (_u * cos(angle) + _v * sin(angle)) * radius
 
 
 func current() -> Vector3:
 	return offset(phase)
-
-
-func path(points: int = 64) -> PackedVector3Array:
-	var result := PackedVector3Array()
-	for i in points:
-		result.append(offset(i * TAU / points))
-	return result
 
 
 func same_path(other: Orbit) -> bool:

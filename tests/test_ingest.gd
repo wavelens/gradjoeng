@@ -76,3 +76,17 @@ func test_worker_metrics_events_from_board_response() -> void:
 	])
 	equal(MetricsPoll.worker_events("garbage"), [])
 	equal(MetricsPoll.worker_events('{"message": 3}'), [])
+
+
+func test_worker_network_events_from_board_network_response() -> void:
+	var body := JSON.stringify({"error": false, "message": {"nar_egress": [], "http": [], "workers": [
+		{"worker_id": "w1", "network_speed_mbps": 88.5, "disk_speed_mbps": 3.0},
+		{"worker_id": null, "network_speed_mbps": 1.0},
+		{"worker_id": "w2", "network_speed_mbps": null},
+	]}})
+	equal(MetricsPoll.network_events(body), [
+		{"event": "worker.network", "content": {"worker_id": "w1", "network_speed_mbps": 88.5}},
+		{"event": "worker.network", "content": {"worker_id": "w2", "network_speed_mbps": null}},
+	])
+	equal(MetricsPoll.network_events("garbage"), [])
+	equal(Endpoints.network_url("https://gradient.example/"), "https://gradient.example/api/v1/board/network")

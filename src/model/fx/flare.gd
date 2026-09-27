@@ -32,12 +32,20 @@ func _init(p_root: Vector3, p_radius: float, p_height: float, p_color: Color, p_
 	life = p_life
 
 
+func frame() -> Basis:
+	return Basis(root, tangent, root.cross(tangent))
+
+
+func lifted(lift: float = 1.0) -> float:
+	return height * lift * growth
+
+
 func points(segments: int = 24, lift: float = 1.0) -> PackedVector3Array:
 	var result := PackedVector3Array()
 	for i in segments + 1:
 		var s := float(i) / segments
 		var base := (root + tangent * (s - 0.5) * spread).normalized()
-		result.append(base * (radius + sin(s * PI) * height * lift * growth))
+		result.append(base * (radius + sin(s * PI) * lifted(lift)))
 	return result
 
 

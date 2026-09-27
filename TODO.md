@@ -1,4 +1,0 @@
- - Banner text should show also disapear when also there is a NarPush or LogPush also make it 30s timer
- - dashed line for cache-server line
- - building builds currently disappear while building
- - make connection line worker-server less obvious

@@ -6,6 +6,7 @@
   dejavu_fonts,
   inter,
   makeFontsConf,
+  release ? false,
 }:
 
 let
@@ -15,7 +16,7 @@ let
   ]; };
 in
 stdenvNoCC.mkDerivation {
-  pname = "gradjoeng";
+  pname = if release then "gradjoeng-release" else "gradjoeng";
   version = "0.1.0";
 
   src = lib.fileset.toSource {
@@ -39,7 +40,14 @@ stdenvNoCC.mkDerivation {
     runHook preBuild
     export HOME=$TMPDIR
     godot --headless --path . --import
-    godot --headless --path . --export-pack Linux gradjoeng.pck
+    mkdir -p build
+  '' + (if release then ''
+    mkdir -p $HOME/.local/share/godot/export_templates
+    ln -s ${godot.export-template}/share/godot/export_templates/* $HOME/.local/share/godot/export_templates/
+    godot --headless --path . --export-release Linux build/gradjoeng
+  '' else ''
+    godot --headless --path . --export-pack Linux build/gradjoeng.pck
+  '') + ''
     runHook postBuild
   '';
 
@@ -53,9 +61,15 @@ stdenvNoCC.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    install -Dm644 gradjoeng.pck $out/share/gradjoeng/gradjoeng.pck
-    makeWrapper ${godot}/bin/godot $out/bin/gradjoeng \
+    install -Dm644 build/gradjoeng.pck $out/share/gradjoeng/gradjoeng.pck
+  '' + (if release then ''
+    install -Dm755 build/gradjoeng $out/share/gradjoeng/gradjoeng
+    makeWrapper $out/share/gradjoeng/gradjoeng $out/bin/gradjoeng \
+      --add-flags "--" \
+  '' else ''
+    makeWrapper ${lib.getExe godot} $out/bin/gradjoeng \
       --add-flags "--main-pack $out/share/gradjoeng/gradjoeng.pck --" \
+  '') + ''
       --set-default FONTCONFIG_FILE ${fontsConf}
     runHook postInstall
   '';
