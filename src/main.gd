@@ -11,6 +11,7 @@ var sources: Array[Node] = []
 var rig: CameraRig
 var view: WorldView
 var hud: Hud
+var directory: NameDirectory
 
 
 func _ready() -> void:
@@ -30,7 +31,8 @@ func _ready() -> void:
 	else:
 		_listen(WebSource.new(options.url, options.token))
 		_listen(MetricsPoll.new(options.url, options.token, options.poll))
-		_listen(NameDirectory.new(options.url, options.token))
+		directory = NameDirectory.new(options.url, options.token)
+		_listen(directory)
 
 
 func _process(delta: float) -> void:
@@ -87,6 +89,8 @@ func _listen(source: Node) -> void:
 
 
 func _on_event(event: Dictionary) -> void:
+	if directory:
+		directory.observe(event)
 	for effect in EventParser.parse(event):
 		world.apply(effect)
 		if effect is Effects.WorkerMessage:

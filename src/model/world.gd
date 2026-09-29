@@ -47,6 +47,7 @@ var evaluations := {}
 var caches := {}
 var build_owner := {}
 var dispatched := {}
+var uploader := ""
 var names := {}
 var offers := {}
 var pacing := {}
@@ -74,6 +75,8 @@ static func evaluation_host(evaluation_id: String) -> String:
 
 func apply(effect: Variant) -> void:
 	if effect is Effects.WorkerMessage:
+		if effect.kind == "nar_push":
+			uploader = effect.job_id
 		_pace(effect)
 	elif effect is Effects.WorkerLoad:
 		_worker(effect.worker_id).cpu = effect.cpu
@@ -159,6 +162,8 @@ func _resolve(resolved: Dictionary) -> void:
 		for bodies in [workers, caches]:
 			if bodies.has(id):
 				bodies[id].born = time
+		if evaluations.has(id):
+			evaluations[id].label = resolved[id]
 
 
 func _list_caches(listed: Dictionary) -> void:
@@ -235,7 +240,7 @@ func _evaluation_changed(change: Effects.EvaluationChanged) -> void:
 	if change.group:
 		_join(evaluation, change.group)
 	if change.repository:
-		evaluation.label = change.repository.rstrip("/").get_file().trim_suffix(".git")
+		evaluation.label = Bodies.repository_label(change.repository)
 	var anchor := func() -> Vector3: return evaluation.position
 	if not change.phase:
 		_spawn([Comet.new(server_position, anchor, Palette.PROGRESS, 0.07, 0.9, 0.2)])
@@ -280,7 +285,7 @@ func _build_changed(change: Effects.BuildChanged) -> void:
 	evaluation.flash = maxf(evaluation.flash, 0.5)
 	var color := Palette.state(change.state)
 	if change.state == "substituted":
-		_substitute(build, color)
+		_substitute(evaluation, build, color)
 	elif change.state in EventParser.GOOD:
 		_spawn(Spark.burst(build.position, color, 18, 3.8, 0.9))
 	elif change.state in EventParser.BAD:
@@ -289,18 +294,21 @@ func _build_changed(change: Effects.BuildChanged) -> void:
 		_spawn([Ripple.new(func() -> Vector3: return build.position, color, 1.3, 0.8, 0.05)])
 
 
-func _substitute(build: Bodies.Build, color: Color) -> void:
+func _substitute(evaluation: Bodies.Evaluation, build: Bodies.Build, color: Color) -> void:
 	build.incoming = true
 	var arrive := func() -> void:
 		build.incoming = false
 		build.flash = 1.0
 		_spawn(Spark.burst(build.position, color, 18, 3.8, 0.9))
-	_spawn([Comet.new(_substitution_source(build), func() -> Vector3: return build.position, color, 0.085, randf_range(1.0, 1.4), randf_range(-0.3, 0.3), arrive)])
+	_spawn([Comet.new(_substitution_source(evaluation, build), func() -> Vector3: return build.position, color, 0.085, randf_range(1.0, 1.4), randf_range(-0.3, 0.3), arrive)])
 
 
-func _substitution_source(build: Bodies.Build) -> Callable:
-	if not caches.is_empty():
-		var cache: Bodies.Cache = caches.values().pick_random()
+func _substitution_source(evaluation: Bodies.Evaluation, build: Bodies.Build) -> Callable:
+	var sources: Array = evaluation.uploads.keys().filter(func(id: String): return caches.has(id)).map(func(id: String): return caches[id])
+	if sources.is_empty():
+		sources = caches.values()
+	if not sources.is_empty():
+		var cache: Bodies.Cache = sources.pick_random()
 		return func() -> Vector3: return cache.position
 	var sky := Vector3(build.position.x + randf_range(-3.4, 3.4), SKY, build.position.z)
 	return func() -> Vector3: return sky
@@ -340,6 +348,18 @@ func _claim(job_id: String, worker: Bodies.Worker) -> void:
 		"build":
 			dispatched[id] = worker.id
 			_board_derivation(id, worker)
+
+
+func _job_evaluation(job_id: String) -> Bodies.Evaluation:
+	var id := job_id.get_slice(":", 1)
+	match job_id.get_slice(":", 0):
+		"eval":
+			return evaluations.get(id)
+		"build":
+			for evaluation in evaluations.values():
+				if evaluation.builds.values().any(func(build: Bodies.Build): return build.derivation_build == id):
+					return evaluation
+	return null
 
 
 func _start(evaluation: Bodies.Evaluation) -> void:
@@ -456,6 +476,9 @@ func _cache_access(access: Effects.CacheAccess) -> void:
 
 func _store(cache_id: String) -> void:
 	var cache := _cache(cache_id)
+	var evaluation := _job_evaluation(uploader)
+	if evaluation:
+		evaluation.uploads[cache_id] = true
 	var arrive := func() -> void: cache.flash = 1.0
 	_spawn([Comet.new(server_position, func() -> Vector3: return cache.position, Palette.STORE, 0.1, 1.3, randf_range(-0.2, 0.2), arrive)])
 
@@ -497,7 +520,7 @@ func _evaluation(evaluation_id: String) -> Bodies.Evaluation:
 	if not evaluations.has(evaluation_id):
 		var slot := _lane(evaluation_id)
 		var electron := Electron.new(SERVER, server_position, _server_orbit(slot, evaluation_id), server_position(), 0.0)
-		evaluations[evaluation_id] = Bodies.Evaluation.new(evaluation_id, evaluation_id.substr(0, 8), slot, evaluation_id, electron, time)
+		evaluations[evaluation_id] = Bodies.Evaluation.new(evaluation_id, names.get(evaluation_id, evaluation_id.substr(0, 8)), slot, evaluation_id, electron, time)
 	return evaluations[evaluation_id]
 
 

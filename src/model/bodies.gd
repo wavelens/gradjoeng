@@ -4,6 +4,10 @@ const UNSTABLE_CPU := 90.0
 const TERMINAL_PHASES := ["completed", "failed", "aborted"]
 
 
+static func repository_label(repository: String) -> String:
+	return repository.rstrip("/").get_file().trim_suffix(".git")
+
+
 class Worker:
 	var id: String
 	var target: float
@@ -83,6 +87,7 @@ class Evaluation:
 	var group: String
 	var electron: Electron
 	var builds := {}
+	var uploads := {}
 	var flash := 1.0
 	var idle := 0.0
 	var alpha := 1.0

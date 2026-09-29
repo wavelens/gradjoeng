@@ -30,7 +30,7 @@ func _draw() -> void:
 		var color := Color(DetectionOverlay.ACCENT, 0.95) if first else Color(1, 1, 1, 0.72)
 		if row == _lines.size() - 1 and _degraded:
 			color = Color(DEGRADED, 0.95)
-		var font := Hud.sans(first)
+		var font := Hud.sans(true) if first else Hud.monospace()
 		var font_size := 11 if first else 13
 		draw_string(font, Vector2(right - 600.0, baseline), _lines[row], HORIZONTAL_ALIGNMENT_RIGHT, 600.0, font_size, color)
 		if row == _lines.size() - 1:

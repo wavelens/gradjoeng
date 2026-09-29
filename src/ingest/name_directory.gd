@@ -1,16 +1,18 @@
 class_name NameDirectory
 extends Node
-## Lists caches as `directory.caches` and resolves worker ids to display names as `directory.names` events.
+## Lists caches as `directory.caches` and resolves worker and evaluation ids to display names as `directory.names` events.
 
 signal event_received(event: Dictionary)
 
 const REFRESH := 60.0
 const CACHES_PATH := "api/v1/caches?per_page=100"
 const PROJECTS_PATH := "api/v1/projects?per_page=100"
+const EVALUATION_PATH := "api/v1/evals/%s"
 
 var _base: String
 var _headers: PackedStringArray
 var _timer := Timer.new()
+var _evaluations := {}
 
 
 func _init(base: String, token: String) -> void:
@@ -51,6 +53,20 @@ static func project_names(body: String) -> Array:
 	return names
 
 
+static func evaluation_names(evaluation_id: String, body: String) -> Dictionary:
+	var evaluation: Variant = _message(body)
+	var repository: Variant = evaluation.get("repository") if evaluation is Dictionary else null
+	return {evaluation_id: Bodies.repository_label(repository)} if repository is String and repository else {}
+
+
+static func unnamed_evaluation(event: Dictionary) -> String:
+	var content: Variant = event.get("content")
+	if not content is Dictionary or content.get("repository") is String:
+		return ""
+	var evaluation: Variant = content.get("evaluation_id")
+	return evaluation if evaluation is String else ""
+
+
 static func worker_names(body: String) -> Dictionary:
 	var workers: Variant = _message(body)
 	var names := {}
@@ -70,6 +86,14 @@ static func _items(body: String) -> Array:
 	if message is Dictionary:
 		message = message.get("items")
 	return message if message is Array else []
+
+
+func observe(event: Dictionary) -> void:
+	var evaluation := unnamed_evaluation(event)
+	if not evaluation or _evaluations.has(evaluation):
+		return
+	_evaluations[evaluation] = true
+	_fetch(EVALUATION_PATH % evaluation.uri_encode(), func(body: String) -> void: _publish(evaluation_names(evaluation, body)))
 
 
 func _refresh() -> void:

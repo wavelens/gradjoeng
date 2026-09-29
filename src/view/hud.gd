@@ -2,7 +2,7 @@ class_name Hud
 extends CanvasLayer
 
 const TITLE := "GRADIENT CI // LIVE"
-const SUBTITLE := ["Modern Nix CI System", "GitHub: wavelens/gradient"]
+const SUBTITLE := ["Nix-CI for Teams", "GitHub: wavelens/gradient"]
 const BANNER_HEADLINE := "Want to see your Nix Flake building?"
 const MATRIX := "Matrix: @derdennisop:matrix.org"
 const TITLE_COLOR := Color("c8beff")

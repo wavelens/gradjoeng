@@ -38,8 +38,20 @@ func test_rate_is_the_measured_traffic() -> void:
 
 func test_utilization_is_the_average_worker_traffic() -> void:
 	var transmission := Transmission.new()
-	check(transmission.telemetry(0.0, 12.34).contains("UTIL 12.3 Mbps"), transmission.telemetry(0.0, 12.34))
-	check(transmission.telemetry(0.0, null).contains("UTIL --"), "unknown without worker samples")
+	check(transmission.telemetry(0.0, 12.34).ends_with("UTIL  12.3 Mbps"), transmission.telemetry(0.0, 12.34))
+	check(transmission.telemetry(0.0, null).ends_with(" --"), "unknown without worker samples")
+
+
+func test_telemetry_lines_keep_a_constant_width() -> void:
+	var transmission := Transmission.new()
+	var idle := transmission.telemetry(0.0, null).split("\n")
+	transmission.glitch = 0.8
+	for i in 100:
+		transmission.receive(1_000_000)
+		transmission.update(0.1)
+	var busy := transmission.telemetry(0.0, 1234.5).split("\n")
+	for row in idle.size():
+		equal(busy[row].length(), idle[row].length())
 
 
 func test_bitrate_picks_a_readable_unit() -> void:

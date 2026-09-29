@@ -464,6 +464,23 @@ func test_substituted_build_arrives_on_comet_from_cache() -> void:
 	check(build.visible and not fx_of(world, Spark).is_empty(), "lands with burst")
 
 
+func test_substituted_build_comes_only_from_caches_the_evaluation_uploaded_to() -> void:
+	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(Effects.BuildChanged.new("b0", "e1", "building", "d0"))
+	for cache in ["c1", "c2", "c3"]:
+		world.apply(Effects.CacheAccess.new(cache, "narinfo", true, 0))
+	world.apply(Effects.WorkerMessage.new("w1", false, "nar_push", 10, "build:d0"))
+	world.apply(Effects.CacheStored.new("c2"))
+	world.apply(Effects.WorkerMessage.new("w1", false, "nar_push", 10, "eval:e1"))
+	world.apply(Effects.CacheStored.new("c3"))
+	equal(world.evaluations["e1"].uploads.keys(), ["c2", "c3"])
+	for i in 20:
+		world.fx.clear()
+		world.apply(Effects.BuildChanged.new("s%d" % i, "e1", "substituted"))
+		check(fx_of(world, Comet)[0].source.call() != world.caches["c1"].position, "never from a cache without uploads")
+
+
 func test_substituted_build_without_cache_falls_from_above() -> void:
 	var world := World.new()
 	world.apply(queued("e1"))
@@ -805,3 +822,14 @@ func test_message_backlog_lag_is_bounded() -> void:
 	world.update(World.MESSAGE_LAG)
 	equal(world.messages.size(), World.MAX_MESSAGES)
 	check(world.backlog.is_empty(), "backlog drained")
+
+
+func test_resolved_names_label_evaluations() -> void:
+	var world := World.new()
+	world.apply(Effects.JobDispatched.new("w1", "e1-abcdef1234", ""))
+	equal(world.evaluations["e1-abcdef1234"].label, "e1-abcde")
+	world.apply(Effects.Names.new({"e1-abcdef1234": "gobgp.nix"}))
+	equal(world.evaluations["e1-abcdef1234"].label, "gobgp.nix")
+	world.apply(Effects.Names.new({"e2-abcdef1234": "other"}))
+	world.apply(Effects.JobDispatched.new("w1", "e2-abcdef1234", ""))
+	equal(world.evaluations["e2-abcdef1234"].label, "other")

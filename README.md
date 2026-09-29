@@ -12,7 +12,7 @@ godot --path . -- --file events/2.log
 - `--url` streams `api/v1/metrics/events` and polls `api/v1/board/workers` every `--poll` seconds to color workers by CPU (green-blue-red, unstable at 90%+)
 - `--url` also polls `api/v1/board/network`; the telemetry readout shows the measured proto traffic rate and `UTIL` as the average worker network throughput
 - `nix run .#release` runs a `--export-release` build on the Godot release template instead of the editor binary
-- `--url` also lists caches via `api/v1/caches` (so idle caches show too) and resolves worker names every minute via `api/v1/projects/{project}/workers`
+- `--url` also lists caches via `api/v1/caches` (so idle caches show too), resolves worker names every minute via `api/v1/projects/{project}/workers` and names evaluations first seen without a repository via `api/v1/evals/{evaluation}`
 - `--banner 1234` shows the "see your Nix Flake building" banner with Matrix and Dect 1234 after 30 s without worker jobs, NAR or log pushes, or after 10 min without a NAR push; `--banner ""` omits the Dect, no flag hides the banner
 - `space` pause, `+` / `-` replay speed, `F11` fullscreen, drag to orbit the camera, wheel to zoom, `q` / `esc` quit
 - tests: `tests/run.sh` (headless Godot) or `nix flake check`
