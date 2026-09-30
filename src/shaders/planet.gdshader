@@ -8,6 +8,7 @@ const float SEA = 0.5;
 const vec3 SUNLIGHT = vec3(1.0, 0.86, 0.72);
 const vec3 SKY = vec3(0.3, 0.55, 1.0);
 const vec3 CITY = vec3(1.0, 0.68, 0.3);
+const vec3 AMBIENT = vec3(0.06, 0.07, 0.09);
 
 uniform vec3 sun = vec3(0.0);
 uniform float spin = 0.1;
@@ -87,7 +88,7 @@ void fragment() {
 	float cloud = smoothstep(0.52, 0.78, fbm3(sky * 3.2 + seed * 11.0 + vec3(0.0, 0.0, TIME * 0.015)));
 	surface = mix(surface, vec3(1.0), cloud * 0.85);
 
-	vec3 color = surface * SUNLIGHT * (0.025 + 1.15 * day * max(lambert, 0.0));
+	vec3 color = surface * (SUNLIGHT * 1.15 * day * max(lambert, 0.0) + AMBIENT);
 	float glint = pow(max(dot(reflect(-light, normal), eye), 0.0), 40.0);
 	color += SUNLIGHT * glint * (1.0 - land) * (1.0 - cloud) * day * 0.6;
 	color += CITY * cities(ground, land) * (1.0 - day) * (1.0 - cloud * 0.7) * (0.3 + 0.9 * heat);

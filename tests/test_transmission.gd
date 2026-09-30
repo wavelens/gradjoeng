@@ -19,6 +19,7 @@ func test_frames_count_up_and_telemetry_reports_link_state() -> void:
 	check(transmission.frame > 0, "frames advance")
 	transmission.glitch = 0.0
 	check(not transmission.telemetry(0.0, null).contains("UNDER HEAVY USE"), "clean link")
+	equal(Array(transmission.telemetry(0.0, null).split("\n")).back().strip_edges(), "LINK NOMINAL")
 	transmission.glitch = 0.8
 	check(transmission.telemetry(0.0, null).contains("LINK UNDER HEAVY USE"), "dropout is reported")
 	check(transmission.telemetry(1790000000.0, null).contains("2026-09-21 "), "UTC timestamp")
@@ -38,8 +39,8 @@ func test_rate_is_the_measured_traffic() -> void:
 
 func test_utilization_is_the_average_worker_traffic() -> void:
 	var transmission := Transmission.new()
-	check(transmission.telemetry(0.0, 12.34).ends_with("UTIL  12.3 Mbps"), transmission.telemetry(0.0, 12.34))
-	check(transmission.telemetry(0.0, null).ends_with(" --"), "unknown without worker samples")
+	check(transmission.telemetry(0.0, 12.34).contains("UTIL  12.3 Mbps\n"), transmission.telemetry(0.0, 12.34))
+	check(transmission.telemetry(0.0, null).contains(" --\n"), "unknown without worker samples")
 
 
 func test_telemetry_lines_keep_a_constant_width() -> void:

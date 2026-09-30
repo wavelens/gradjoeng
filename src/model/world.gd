@@ -319,7 +319,6 @@ func _dispatch(dispatch: Effects.JobDispatched) -> void:
 	worker.heat = 1.0
 	if offers.has(worker.id):
 		offers[worker.id].score = dispatch.score
-	_spawn([Ripple.new(func() -> Vector3: return worker.position, Palette.DISPATCH, 1.0, 0.7, 0.05)])
 	if dispatch.derivation_build:
 		dispatched[dispatch.derivation_build] = worker.id
 		_board_derivation(dispatch.derivation_build, worker)

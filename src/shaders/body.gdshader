@@ -32,7 +32,7 @@ void fragment() {
 	}
 	vec3 normal = vec3(p.x, -p.y, sqrt(1.0 - r * r));
 	float lambert = dot(normal, light);
-	float band = lambert > 0.45 ? 1.0 : lambert > 0.05 ? 0.62 : 0.07;
+	float band = lambert > 0.45 ? 1.0 : lambert > 0.05 ? 0.62 : 0.16;
 	vec3 color = tint.rgb * band;
 	color = mix(color, vec3(1.0), smoothstep(core, core * 0.6, r) * clamp(lambert * 2.0 + 0.2, 0.0, 1.0));
 	color += vec3(1.0, 0.6, 0.3) * pow(1.0 - normal.z, 3.0) * max(dot(normal.xy, light.xy), 0.0) * 0.8;

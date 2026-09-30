@@ -34,5 +34,5 @@ func _draw() -> void:
 		var font_size := 11 if first else 13
 		draw_string(font, Vector2(right - 600.0, baseline), _lines[row], HORIZONTAL_ALIGNMENT_RIGHT, 600.0, font_size, color)
 		if row == _lines.size() - 1:
-			var width := font.get_string_size(_lines[row], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			var width := font.get_string_size(_lines[row].lstrip(" "), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 			draw_circle(Vector2(right - width - 10.0, baseline - 4.5), 3.0, DEGRADED if _degraded else NOMINAL)

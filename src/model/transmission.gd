@@ -50,6 +50,6 @@ func _interfere() -> void:
 
 func telemetry(unix_time: float, worker_mbps: Variant) -> String:
 	var stamp := Time.get_datetime_string_from_unix_time(int(unix_time), true) + ".%03d UTC" % int(fmod(unix_time, 1.0) * 1000.0)
-	var link := ("LINK UNDER HEAVY USE" if glitch > DEGRADED else "LINK NOMINAL").rpad(20)
+	var link := ("LINK UNDER HEAVY USE" if glitch > DEGRADED else "LINK NOMINAL").lpad(20)
 	var utilization := "--" if worker_mbps == null else bitrate(worker_mbps * 1e6)
-	return "%s\n%s\nFRAME %07d  ·  EXP 2.90 s\n%s  ·  %s  ·  UTIL %s" % [INSTRUMENT, stamp, frame, link, bitrate(bits_per_second).lpad(10), utilization.lpad(10)]
+	return "%s\n%s\nFRAME %07d  ·  EXP 2.90 s\nRX   %s\nUTIL %s\n%s" % [INSTRUMENT, stamp, frame, bitrate(bits_per_second).lpad(10), utilization.lpad(10), link]

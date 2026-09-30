@@ -2,7 +2,6 @@ shader_type canvas_item;
 
 const int MAX_GLITCHES = 8;
 const float TEAR = 60.0;
-const float BLOCK = 12.0;
 const float SPLIT = 5.0;
 
 uniform vec4 glitches[MAX_GLITCHES];
@@ -36,9 +35,7 @@ void fragment() {
 		float tick = floor(TIME * 30.0);
 		float row = floor(pixel.y / mix(3.0, 14.0, random(vec2(tick, 1.0))));
 		float tear = step(1.0 - s * 0.6, random(vec2(row, tick))) * (random(vec2(row, tick + 7.0)) - 0.5) * TEAR * s;
-		vec2 block = floor(pixel / BLOCK);
-		vec2 jump = step(1.0 - s * 0.12, random(block + tick)) * (vec2(random(block + tick + 3.0), random(block + tick + 5.0)) - 0.5) * BLOCK * 2.0 * s;
-		vec2 at = pixel + vec2(tear, 0.0) + jump;
+		vec2 at = pixel + vec2(tear, 0.0);
 		vec4 red = ink(TEXTURE, at + vec2(SPLIT * s, 0.0));
 		vec4 green = ink(TEXTURE, at);
 		vec4 blue = ink(TEXTURE, at - vec2(SPLIT * s, 0.0));

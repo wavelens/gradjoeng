@@ -21,12 +21,13 @@ const GLOW := Color(0, 0, 0, 0)
 const RING := 1.0
 const ORBIT_SEGMENTS := 128
 const FLARE_SEGMENTS := 32
-const ORBIT_WIDTH := 0.05
+const ORBIT_WIDTH := 0.035
 const WORKER_RADIUS := 1.2
 const EVALUATION_RADIUS := 0.36
 const BUILD_RADIUS := 0.17
 const CACHE_RADIUS := 2.0
 const SUNLIGHT := Color("ff6a3d")
+const AMBIENT := Color("8fa3c8")
 const RIM_REACH := 1.08
 const LINK_LANE := 0.085
 const LINK_PACKETS := 40
@@ -67,8 +68,6 @@ func _ready() -> void:
 
 func transmit(transmission: Transmission) -> void:
 	lens.material.set_shader_parameter("glitch", transmission.glitch)
-	if transmission.glitch > 0.0:
-		lens.material.set_shader_parameter("seed", float(randi() % 997))
 
 
 func draw(world: World, p_eye: Vector3) -> void:
@@ -114,19 +113,33 @@ func _environment() -> WorldEnvironment:
 	environment.sky = Sky.new()
 	environment.sky.sky_material = sky_material
 	environment.tonemap_mode = Environment.TONE_MAPPER_AGX
-	environment.tonemap_exposure = 1.0
+	environment.tonemap_exposure = 1.3
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = AMBIENT
+	environment.ambient_light_energy = 0.35
 	environment.adjustment_enabled = true
 	environment.adjustment_color_correction = FilmLut.texture()
 	environment.glow_enabled = true
-	environment.glow_intensity = 0.35
-	environment.glow_bloom = 0.0
-	environment.glow_hdr_threshold = 1.4
+	environment.glow_intensity = 0.42
+	environment.glow_bloom = 0.03
+	environment.glow_hdr_threshold = 1.1
 	environment.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 	for level in GLOW_LEVELS.size():
 		environment.set_glow_level(level, GLOW_LEVELS[level])
 	var node := WorldEnvironment.new()
 	node.environment = environment
+	node.camera_attributes = _auto_exposure()
 	return node
+
+
+func _auto_exposure() -> CameraAttributesPractical:
+	var attributes := CameraAttributesPractical.new()
+	attributes.auto_exposure_enabled = true
+	attributes.auto_exposure_min_sensitivity = 80.0
+	attributes.auto_exposure_max_sensitivity = 320.0
+	attributes.auto_exposure_scale = 0.3
+	attributes.auto_exposure_speed = 0.6
+	return attributes
 
 
 func _lens() -> CanvasLayer:
@@ -223,11 +236,11 @@ func _link(start: Vector3, end: Vector3, energy: float) -> void:
 
 func _orbits(world: World) -> void:
 	for evaluation in world.evaluations.values():
-		var color := Palette.shade(Palette.state(evaluation.phase), 0.06 + evaluation.flash * 0.18)
+		var color := Palette.shade(Palette.state(evaluation.phase), 0.035 + evaluation.flash * 0.12)
 		_orbit_ring(evaluation.electron, Color(color, evaluation.alpha))
 		for build in evaluation.visible_builds():
 			if not build.electron.host.begins_with("evaluation:"):
-				_orbit_ring(build.electron, Color(Palette.shade(Palette.state(build.state), 0.1), evaluation.alpha))
+				_orbit_ring(build.electron, Color(Palette.shade(Palette.state(build.state), 0.06), evaluation.alpha))
 
 
 func _orbit_ring(electron: Electron, color: Color) -> void:
