@@ -25,6 +25,8 @@ func _ready() -> void:
 		return
 	get_window().title = TITLE
 	get_window().size = options.size
+	if options.fullscreen:
+		get_window().mode = Window.MODE_FULLSCREEN
 	rig = CameraRig.new()
 	view = WorldView.new()
 	hud = Hud.new(options.banner, options.dect)

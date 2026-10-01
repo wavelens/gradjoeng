@@ -9,6 +9,8 @@
   stdenvNoCC,
   godot,
   makeWrapper,
+  makeDesktopItem,
+  copyDesktopItems,
   dejavu_fonts,
   inter,
   makeFontsConf,
@@ -40,6 +42,18 @@ stdenvNoCC.mkDerivation {
   nativeBuildInputs = [
     godot
     makeWrapper
+    copyDesktopItems
+  ];
+
+  desktopItems = [
+    (makeDesktopItem {
+      name = "gradjoeng";
+      desktopName = "Gradjöng";
+      comment = "Live view of Gradient CI events";
+      exec = "gradjoeng";
+      icon = "gradjoeng";
+      categories = [ "Development" ];
+    })
   ];
 
   buildPhase = ''
@@ -67,6 +81,7 @@ stdenvNoCC.mkDerivation {
 
   installPhase = ''
     runHook preInstall
+    install -Dm644 icon.svg $out/share/icons/hicolor/scalable/apps/gradjoeng.svg
   '' + (if release then ''
     install -Dm755 build/gradjoeng $out/share/gradjoeng/gradjoeng
     mkdir -p $out/nix-support

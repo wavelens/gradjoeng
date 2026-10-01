@@ -14,7 +14,7 @@ uniform float jitter = 0.6;
 uniform float halation = 0.35;
 uniform float glitch = 0.0;
 
-const float TEAR = 120.0;
+const float TEAR = 50.0;
 const float RESEED = 30.0;
 
 float random(vec2 p) {
@@ -35,7 +35,7 @@ float channel(vec2 uv, int index) {
 float tear(float row, float seed) {
 	float height = mix(2.0, 40.0, random(vec2(seed, 7.0)));
 	float band = floor(row / height + random(vec2(floor(row / 90.0), seed)) * 3.0);
-	float hit = step(1.0 - glitch * 0.45, random(vec2(band, seed + 1.0)));
+	float hit = step(1.0 - glitch * 0.3, random(vec2(band, seed + 1.0)));
 	return hit * (random(vec2(band, seed + 2.0)) - 0.5) * 2.0 * TEAR * glitch;
 }
 

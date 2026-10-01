@@ -37,3 +37,22 @@ func test_banner_takes_dect_number_or_empty() -> void:
 	equal([with_dect.banner, with_dect.dect, with_dect.error], [true, "1234", ""])
 	var without_dect := Cli.parse(["--file", "x", "--banner", ""])
 	equal([without_dect.banner, without_dect.dect, without_dect.error], [true, "", ""])
+
+
+func test_fullscreen_is_a_switch() -> void:
+	equal(Cli.parse(["--file", "x"]).fullscreen, false)
+	var options := Cli.parse(["--fullscreen", "--file", "x"])
+	equal([options.fullscreen, options.file, options.error], [true, "x", ""])
+
+
+func test_token_file_reads_trimmed_token() -> void:
+	var path := "user://token"
+	FileAccess.open(path, FileAccess.WRITE).store_string("secret\n")
+	var options := Cli.parse(["--url", "https://gradient.example", "--token-file", path])
+	equal([options.token, options.error], ["secret", ""])
+	DirAccess.remove_absolute(path)
+
+
+func test_token_file_rejects_missing_file_and_token_conflict() -> void:
+	check(Cli.parse(["--url", "u", "--token-file", "user://missing"]).error != "", "missing token file")
+	check(Cli.parse(["--url", "u", "--token", "t", "--token-file", "res://project.godot"]).error != "", "token and token file")

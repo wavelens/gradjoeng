@@ -34,9 +34,11 @@ nix run .#release -- --file events/1.log
 | `--file FILE` | | Event log to replay; exclusive with `--url` |
 | `--url URL` | | Gradient instance to stream events from |
 | `--token TOKEN` | | API token, only with `--url` |
+| `--token-file FILE` | | File containing the API token, exclusive with `--token` |
 | `--poll SECONDS` | `5` | Interval for worker load and network polling |
 | `--speed SPEED` | `1` | Replay speed of `--file` |
 | `--size WxH` | `1280x800` | Window size |
+| `--fullscreen` | off | Start in fullscreen |
 | `--banner DECT` | hidden | "See your Nix Flake building" banner with Matrix and Dect number after idle time; `""` omits the Dect |
 
 ## Live Data
