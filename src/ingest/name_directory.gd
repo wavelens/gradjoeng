@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name NameDirectory
 extends Node
 ## Lists caches as `directory.caches` and resolves worker and evaluation ids to display names as `directory.names` events.

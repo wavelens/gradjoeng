@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+//
+// SPDX-License-Identifier: MIT
+
 void billboard(inout mat4 modelview, mat4 view, mat4 inv_view, mat4 model) {
 	modelview = view * mat4(inv_view[0], inv_view[1], inv_view[2], model[3]);
 	modelview = modelview * mat4(

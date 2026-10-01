@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name Transmission
 extends RefCounted
 ## Downlink of the observing satellite: clean, except for small interference from traffic, reporting the measured traffic rate.

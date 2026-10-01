@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
 {
   description = "Gradjöng: live view of Gradient CI events";
   inputs = {

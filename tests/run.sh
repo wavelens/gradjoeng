@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 set -uo pipefail
 cd "$(dirname "$0")/.."
 godot --headless --path . --import >/dev/null 2>&1

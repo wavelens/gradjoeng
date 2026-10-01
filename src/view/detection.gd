@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name Detection
 ## Timeline of the camera's object recognition: a burst of short beats, a fast decode, then a quick release.
 

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 extends Suite
 
 const FIXTURE := "res://tests/fixtures/events.jsonl"

@@ -1,0 +1,6 @@
+version = 1
+
+[[annotations]]
+path = ["**.uid", "**.import", "*.md", "LICENSE", "icon.svg", "main.tscn", "project.godot", "export_presets.cfg", "flake.lock", "events/**", "tests/fixtures/**"]
+SPDX-FileCopyrightText = "2026 Wavelens GmbH <info@wavelens.io>"
+SPDX-License-Identifier = "MIT"

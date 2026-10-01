@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name RibbonBatch
 extends MeshInstance3D
 ## Camera-facing strips (trails, orbits, links) rebuilt every frame into one surface.

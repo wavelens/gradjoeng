@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name WorldView
 extends Node3D
 ## Redraws the whole world every frame around a shader-driven sun: additive billboards for glows and rings,

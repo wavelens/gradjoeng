@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name Satellite
 extends Node3D
 ## A cache as a small satellite: gold-foil bus, two solar wings and a dish, all facing the sun.

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name FilmLut
 ## Film-emulation grade baked into a 3D lookup texture for the environment's color correction.
 

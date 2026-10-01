@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name DetectionScreen
 extends Control
 ## Renders the detection overlay offscreen so its reticles can tear, split and jump on their own.

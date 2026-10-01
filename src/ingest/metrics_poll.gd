@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name MetricsPoll
 extends Node
 ## Polls worker load and network throughput every `interval` seconds as `worker.metrics` and `worker.network` events.

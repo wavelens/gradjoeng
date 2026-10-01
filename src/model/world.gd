@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name World
 extends RefCounted
 ## Simulation state of the live view in world units: the server is a sun at the origin, workers circle it on the ground ring.

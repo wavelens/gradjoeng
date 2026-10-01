@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name EventParser
 
 const EVALUATION_PHASES := ["queued", "evaluating", "evaluating", "building", "waiting", "completed", "failed", "aborted", "fetching"]

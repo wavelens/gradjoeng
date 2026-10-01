@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+//
+// SPDX-License-Identifier: MIT
+
 float hash13(vec3 p) {
 	p = fract(p * 0.1031);
 	p += dot(p, p.zyx + 31.32);

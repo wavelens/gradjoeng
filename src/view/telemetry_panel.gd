@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name TelemetryPanel
 extends Control
 ## Top-right downlink readout: instrument line in accent, status dot on the link line.

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name SpriteBatch
 extends MultiMeshInstance3D
 ## Camera-facing instances (quads, or ribbon strips bent by the shader) drawn in one call; rebuilt every frame from a flat instance buffer.

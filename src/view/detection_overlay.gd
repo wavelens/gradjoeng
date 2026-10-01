@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name DetectionOverlay
 extends Control
 ## Screen-space tracking reticles the camera draws around newly discovered bodies.

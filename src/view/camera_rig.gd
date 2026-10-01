@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name CameraRig
 extends Camera3D
 ## Looks at the server from above the worker ring; drifts slowly, drag to orbit, wheel to zoom.

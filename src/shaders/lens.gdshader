@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+//
+// SPDX-License-Identifier: MIT
+
 shader_type canvas_item;
 
 uniform sampler2D screen : hint_screen_texture, filter_linear_mipmap, repeat_disable;

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name ReplayClock
 extends RefCounted
 ## Re-emits recorded events with their original spacing, scaled by `speed` and capped at `max_gap` seconds.

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name Shockwave
 extends RefCounted
 ## A flat front leaving `anchor` at constant speed: a full ring, or an eighth circle facing `toward`; `on_arrive` fires at `reach`.

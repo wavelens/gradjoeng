@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
 {
   lib,
   stdenvNoCC,
@@ -61,12 +67,14 @@ stdenvNoCC.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    install -Dm644 build/gradjoeng.pck $out/share/gradjoeng/gradjoeng.pck
   '' + (if release then ''
     install -Dm755 build/gradjoeng $out/share/gradjoeng/gradjoeng
+    mkdir -p $out/nix-support
+    echo "file binary-dist $out/share/gradjoeng/gradjoeng" >> $out/nix-support/hydra-build-products
     makeWrapper $out/share/gradjoeng/gradjoeng $out/bin/gradjoeng \
       --add-flags "--" \
   '' else ''
+    install -Dm644 build/gradjoeng.pck $out/share/gradjoeng/gradjoeng.pck
     makeWrapper ${lib.getExe godot} $out/bin/gradjoeng \
       --add-flags "--main-pack $out/share/gradjoeng/gradjoeng.pck --" \
   '') + ''
@@ -77,6 +85,7 @@ stdenvNoCC.mkDerivation {
   meta = {
     description = "Live view of Gradient CI events";
     mainProgram = "gradjoeng";
+    license = lib.licenses.mit;
     platforms = lib.platforms.linux;
   };
 }

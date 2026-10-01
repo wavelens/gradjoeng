@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Wavelens GmbH <info@wavelens.io>
+#
+# SPDX-License-Identifier: MIT
+
 class_name LabelPool
 extends Node3D
 ## Reuses billboard labels across frames; labels not shown in a frame are hidden.
