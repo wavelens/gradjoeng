@@ -8,16 +8,27 @@
   description = "Gradjöng: live view of Gradient CI events";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    utils.url = "github:numtide/flake-utils";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, utils }: (utils.lib.eachDefaultSystem (system: let
-    pkgs = import nixpkgs { inherit system; };
+  outputs = { self, nixpkgs, flake-utils }: {
+    overlays.default = final: prev: {
+      gradjoeng = final.callPackage ./nix/packages/gradjoeng.nix { release = true; };
+    };
+
+    nixosModules.default = {
+      nixpkgs.overlays = [ self.overlays.default ];
+    };
+  } // (flake-utils.lib.eachDefaultSystem (system: let
+    pkgs = import nixpkgs {
+      inherit system;
+      overlays = [ self.overlays.default ];
+    };
   in {
-    packages = rec {
+    packages = {
       gradjoeng = pkgs.callPackage ./nix/packages/gradjoeng.nix { };
-      release = pkgs.callPackage ./nix/packages/gradjoeng.nix { release = true; };
-      default = gradjoeng;
+      release = pkgs.gradjoeng;
+      default = pkgs.gradjoeng;
     };
 
     checks.gradjoeng = self.packages.${system}.gradjoeng;
