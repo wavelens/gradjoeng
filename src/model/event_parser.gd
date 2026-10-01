@@ -138,8 +138,9 @@ static func _directory(name: String, content: Dictionary) -> Array:
 
 static func _cache(name: String, content: Dictionary) -> Array:
 	var cache := text(content, "cache")
-	if not cache:
-		return [Effects.ServerPulse.new("cache")]
-	if name == "cache.nar.signed":
-		return [Effects.CacheStored.new(cache)]
-	return [Effects.CacheAccess.new(cache, name.get_slice(".", 1), content.get("hit", true), int(number(content, "size")))]
+	match name:
+		"cache.nar.signed" when cache:
+			return [Effects.CacheStored.new(cache)]
+		"cache.nar.fetched", "cache.narinfo.served" when cache:
+			return [Effects.CacheAccess.new(cache, name.get_slice(".", 1), content.get("hit", true), int(number(content, "size")))]
+	return [Effects.ServerPulse.new("cache")]

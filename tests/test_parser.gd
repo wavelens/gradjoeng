@@ -107,8 +107,13 @@ func test_worker_network_carries_mbps() -> void:
 
 func test_graph_and_cache_pulse_the_server() -> void:
 	equal(only(EventParser.parse(ev("graph.requeued", {"requeued": 0.0}))).kind, "graph")
-	equal(EventParser.parse(ev("graph.ingested", {"evaluation_id": "e1"}))[0].kind, "graph")
+	equal(EventParser.parse(ev("graph.recorded", {"evaluation_id": "e1"}))[0].kind, "graph")
 	equal(only(EventParser.parse(ev("cache.nar.fetched"))).kind, "cache")
+
+
+func test_cache_audit_events_are_no_traffic() -> void:
+	for name in ["cache.member.create", "cache.nar.upload", "cache.update"]:
+		equal(only(EventParser.parse(ev(name, {"action": name, "cache": "c1", "user": "u1"}))).kind, "cache")
 
 
 func test_cache_events_address_their_cache() -> void:
