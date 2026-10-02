@@ -126,4 +126,5 @@ func _fetch(path: String, on_body: Callable) -> void:
 		else:
 			push_warning("name lookup %s failed: result %d, HTTP %d" % [path, result, code])
 		request.queue_free())
-	request.request(Endpoints.api_url(_base, path), _headers)
+	if request.request(Endpoints.api_url(_base, path), _headers) != OK:
+		request.queue_free()

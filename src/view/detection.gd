@@ -41,6 +41,8 @@ static func beat(age: float, name: String) -> float:
 static func decoded(text: String, age: float, seed: int) -> String:
 	if age < IDENTIFY:
 		return ""
+	if age >= IDENTIFY + SOLVE:
+		return text
 	var rng := RandomNumberGenerator.new()
 	var slot := int(age * FLICKER)
 	var result := ""

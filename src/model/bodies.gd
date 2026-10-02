@@ -107,7 +107,12 @@ class Evaluation:
 
 	var busy: bool:
 		get:
-			return electron.host.begins_with("worker:") or builds.values().any(func(build: Build): return build.state == "building")
+			if electron.host.begins_with("worker:"):
+				return true
+			for build in builds.values():
+				if build.state == "building":
+					return true
+			return false
 
 	func _init(p_id: String, p_label: String, p_slot: int, p_group: String, p_electron: Electron, p_born: float) -> void:
 		id = p_id
@@ -118,7 +123,11 @@ class Evaluation:
 		electron = p_electron
 
 	func visible_builds() -> Array:
-		return builds.values().filter(func(build: Build): return build.visible)
+		var result := []
+		for build in builds.values():
+			if build.visible:
+				result.append(build)
+		return result
 
 
 class Headline:

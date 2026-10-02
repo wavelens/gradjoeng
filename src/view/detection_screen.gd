@@ -44,6 +44,11 @@ static func strongest(glitches: Array[Vector4], limit: int) -> PackedVector4Arra
 func track(world: World, camera: Camera3D) -> void:
 	_fit()
 	_overlay.track(world, camera)
+	var tracking := _overlay.tracking()
+	_screen.visible = tracking
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if tracking else SubViewport.UPDATE_DISABLED
+	if not tracking:
+		return
 	_screen.material.set_shader_parameter("glitches", strongest(_overlay.glitches(), MAX_GLITCHES))
 	_screen.material.set_shader_parameter("canvas", get_viewport_rect().size)
 

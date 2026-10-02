@@ -5,7 +5,7 @@
 class_name WorldView
 extends Node3D
 ## Redraws the whole world every frame around a shader-driven sun: additive billboards for glows and rings,
-## cel-shaded discs with depth for bodies, camera-facing ribbons for trails, and shader-bent strips for orbits, links and flares.
+## cel-shaded discs with depth for bodies, camera-facing segments for trails and links, and shader-bent strips for orbits and flares.
 
 const GLOW_SHADER := preload("res://src/shaders/glow.gdshader")
 const BODY_SHADER := preload("res://src/shaders/body.gdshader")
@@ -18,6 +18,8 @@ const PROMINENCE_SHADER := preload("res://src/shaders/prominence.gdshader")
 const LENS_SHADER := preload("res://src/shaders/lens.gdshader")
 const ORBIT_SHADER := preload("res://src/shaders/orbit.gdshader")
 const LINK_SHADER := preload("res://src/shaders/link.gdshader")
+const COMET_SHADER := preload("res://src/shaders/comet.gdshader")
+const COMET_HEAD_SHADER := preload("res://src/shaders/comet_head.gdshader")
 const STRANDS := [1.0, 0.93, 1.05, 0.88]
 const GLOW_LEVELS := [0.0, 0.3, 0.3, 0.1, 0.0, 0.0, 0.0]
 
@@ -53,6 +55,8 @@ var bodies := SpriteBatch.new(BODY_SHADER)
 var planets := SpriteBatch.new(PLANET_SHADER)
 var ribbons := RibbonBatch.new(RIBBON_SHADER)
 var links := RibbonBatch.new(LINK_SHADER)
+var comets := SpriteBatch.new(COMET_SHADER, SpriteBatch.strip(Comet.TRAIL_SEGMENTS))
+var comet_heads := SpriteBatch.new(COMET_HEAD_SHADER)
 var orbits := SpriteBatch.new(ORBIT_SHADER, SpriteBatch.strip(ORBIT_SEGMENTS))
 var prominences := SpriteBatch.new(PROMINENCE_SHADER, SpriteBatch.strip(FLARE_SEGMENTS))
 var labels := LabelPool.new()
@@ -66,7 +70,7 @@ var eye := Vector3.ZERO
 func _ready() -> void:
 	prominences.material_override.set_shader_parameter("radius", World.SUN_RADIUS)
 	links.material_override.set_shader_parameter("spacing", World.WORKER_RING / LINK_PACKETS)
-	for child in [_environment(), _lens(), _sun(), _sunlight(), _chromosphere(), prominences, orbits, links, ribbons, glows, bodies, planets, labels]:
+	for child in [_environment(), _lens(), _sun(), _sunlight(), _chromosphere(), prominences, orbits, links, ribbons, comets, comet_heads, glows, bodies, planets, labels]:
 		add_child(child)
 
 
@@ -79,8 +83,9 @@ func draw(world: World, p_eye: Vector3) -> void:
 	glows.begin()
 	bodies.begin()
 	planets.begin()
-	ribbons.begin(eye)
-	links.begin(eye)
+	ribbons.begin()
+	links.begin()
+	comets.begin()
 	orbits.begin()
 	prominences.begin()
 	labels.begin()
@@ -100,6 +105,8 @@ func draw(world: World, p_eye: Vector3) -> void:
 	planets.commit()
 	ribbons.commit()
 	links.commit()
+	comets.commit()
+	comet_heads.mirror(comets)
 	orbits.commit()
 	prominences.commit()
 	labels.commit()
@@ -278,11 +285,8 @@ func _fading_arc(points: PackedVector3Array, color: Color, width: float) -> void
 
 func _comets(world: World) -> void:
 	for comet in world.fx:
-		if comet is Comet and not comet.trail.is_empty():
-			ribbons.strip(comet.trail, comet.color, comet.size, false, true)
-			var head: Vector3 = comet.trail[comet.trail.size() - 1]
-			glows.add(head, comet.size * 4.0, Palette.shade(comet.color, 0.8))
-			glows.add(head, comet.size * 1.2, Color.WHITE)
+		if comet is Comet and comet.age > 0.0:
+			comets.add_frame(comet.path(), Vector3(comet.tail, comet.progress, comet.size), comet.color)
 
 
 func _echoes(world: World) -> void:
@@ -351,6 +355,8 @@ func _workers(world: World) -> void:
 
 
 static func garbled(text: String, odds: float) -> String:
+	if odds <= 0.0:
+		return text
 	var result := ""
 	for character in text:
 		result += Detection.GLYPHS[randi() % Detection.GLYPHS.length()] if character != " " and randf() < odds else character
@@ -362,7 +368,7 @@ func _evaluations(world: World) -> void:
 		var color := Palette.state(evaluation.phase)
 		var alpha: float = evaluation.alpha
 		var at: Vector3 = evaluation.position
-		ribbons.strip(evaluation.electron.trail, Color(color, alpha), 0.15, false, true)
+		ribbons.trail(evaluation.electron.trail, Color(color, alpha), 0.15)
 		glows.add(at, 0.48 + evaluation.flash * 0.68, Palette.shade(color, alpha * (0.6 + evaluation.flash * 0.8)))
 		bodies.add(at, EVALUATION_RADIUS, Color(color, alpha), Color(0.28, 0, 0, 0))
 		var age: float = world.time - evaluation.born
@@ -374,8 +380,7 @@ func _evaluations(world: World) -> void:
 
 func _build(build: Bodies.Build, alpha: float) -> void:
 	var color := Palette.state(build.state)
-	var trail := build.electron.trail.slice(maxi(build.electron.trail.size() - 10, 0))
-	ribbons.strip(trail, Color(color, alpha * 0.8), 0.06, false, true)
+	ribbons.trail(build.electron.trail, Color(color, alpha * 0.8), 0.06, maxi(build.electron.trail.size() - 10, 0))
 	glows.add(build.position, 0.34 + build.flash * 0.42, Palette.shade(color, alpha * (1.1 + build.flash) * 0.5))
 	bodies.add(build.position, BUILD_RADIUS, Color(color, alpha), Color(0.35, 0, 0, 0))
 

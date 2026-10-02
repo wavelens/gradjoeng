@@ -50,6 +50,7 @@ var workers := {}
 var evaluations := {}
 var caches := {}
 var build_owner := {}
+var derivations := {}
 var dispatched := {}
 var uploader := ""
 var names := {}
@@ -124,8 +125,12 @@ func update(dt: float) -> void:
 		cache.flash *= pow(0.1, dt)
 		cache.alarm *= pow(0.2, dt)
 	var current := fx
+	var alive := []
 	fx = []
-	fx = current.filter(func(effect): return effect.update(dt)) + fx
+	for effect in current:
+		if effect.update(dt):
+			alive.append(effect)
+	fx = alive + fx
 
 
 func describe(line: Bodies.Headline) -> String:
@@ -274,7 +279,7 @@ func _build_changed(change: Effects.BuildChanged) -> void:
 		return
 	var build := _build(evaluation, change.build_id)
 	if change.derivation_build:
-		build.derivation_build = change.derivation_build
+		_link_derivation(build, change.derivation_build)
 	if build.state == change.state:
 		return
 	build.state = change.state
@@ -359,9 +364,9 @@ func _job_evaluation(job_id: String) -> Bodies.Evaluation:
 		"eval":
 			return evaluations.get(id)
 		"build":
-			for evaluation in evaluations.values():
-				if evaluation.builds.values().any(func(build: Bodies.Build): return build.derivation_build == id):
-					return evaluation
+			var linked := _builds_of(id)
+			if linked:
+				return evaluations.get(build_owner[linked[0].id])
 	return null
 
 
@@ -381,10 +386,24 @@ func _board_derivation(derivation_build: String, worker: Bodies.Worker) -> void:
 
 
 func _builds_of(derivation_build: String) -> Array:
-	var linked := []
-	for evaluation in evaluations.values():
-		linked.append_array(evaluation.builds.values().filter(func(build): return build.derivation_build == derivation_build))
-	return linked
+	return derivations.get(derivation_build, [])
+
+
+func _link_derivation(build: Bodies.Build, derivation_build: String) -> void:
+	if build.derivation_build == derivation_build:
+		return
+	_unlink_derivation(build)
+	build.derivation_build = derivation_build
+	if not derivations.has(derivation_build):
+		derivations[derivation_build] = []
+	derivations[derivation_build].append(build)
+
+
+func _unlink_derivation(build: Bodies.Build) -> void:
+	var linked: Array = derivations.get(build.derivation_build, [])
+	linked.erase(build)
+	if linked.is_empty():
+		derivations.erase(build.derivation_build)
 
 
 func _offer(worker: Bodies.Worker) -> void:
@@ -553,11 +572,22 @@ func _follow(host: Electron) -> Callable:
 
 
 func _workers_busy() -> bool:
-	return electrons().any(func(electron: Electron): return electron.host.begins_with("worker:"))
+	for evaluation in evaluations.values():
+		if evaluation.electron.host.begins_with("worker:"):
+			return true
+		for build in evaluation.builds.values():
+			if build.electron.host.begins_with("worker:"):
+				return true
+	return false
 
 
 func _electrons_on(host: String) -> int:
-	return electrons().filter(func(electron: Electron): return electron.host == host).size()
+	var count := 0
+	for evaluation in evaluations.values():
+		count += int(evaluation.electron.host == host)
+		for build in evaluation.builds.values():
+			count += int(build.electron.host == host)
+	return count
 
 
 func _server_orbit(slot: int, group: String) -> Orbit:
@@ -618,8 +648,9 @@ func _absorb(evaluation: Bodies.Evaluation, build: Bodies.Build) -> void:
 
 func _retire(evaluation: Bodies.Evaluation) -> void:
 	evaluations.erase(evaluation.id)
-	for build_id in evaluation.builds:
-		build_owner.erase(build_id)
+	for build in evaluation.builds.values():
+		build_owner.erase(build.id)
+		_unlink_derivation(build)
 
 
 func _place_worker(worker: Bodies.Worker) -> void:

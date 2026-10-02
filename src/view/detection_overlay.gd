@@ -48,6 +48,10 @@ func _add(camera: Camera3D, at: Vector3, radius: float, age: float, kind: String
 	_targets.append({"center": center, "radius": maxf(center.distance_to(edge) * 1.8, 12.0), "age": age, "kind": kind, "name": name, "seed": hash(name)})
 
 
+func tracking() -> bool:
+	return not _targets.is_empty()
+
+
 func glitches() -> Array[Vector4]:
 	var result: Array[Vector4] = []
 	for target in _targets:

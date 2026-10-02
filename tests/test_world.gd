@@ -613,6 +613,26 @@ func test_retired_evaluations_are_freed() -> void:
 	check(gone.get_ref() == null, "evaluation freed")
 
 
+func test_retired_builds_leave_no_derivation_behind() -> void:
+	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(Effects.BuildChanged.new("b1", "e1", "completed", "d1"))
+	world.apply(Effects.EvaluationChanged.new("e1", "completed"))
+	var gone: WeakRef = weakref(world.evaluations["e1"].builds["b1"])
+	step(world, World.EVAL_LINGER + World.EVAL_FADE + 3.0)
+	check(gone.get_ref() == null, "build freed")
+
+
+func test_comet_trail_covers_the_last_moments_of_its_path() -> void:
+	var target := Vector3(10, 0, 0)
+	var comet := Comet.new(func(): return Vector3.ZERO, func(): return target, Color.WHITE, 0.1, 1.0, 0.3)
+	comet.update(0.05)
+	equal(comet.tail, 0.0, "trail grows from the source")
+	comet.update(0.5)
+	near(comet.progress - comet.tail, Comet.TRAIL_TIME / comet.duration)
+	equal([comet.path().x, comet.path().z], [Vector3.ZERO, target], "path runs from source to target")
+
+
 func test_server_pulse_erupts_flare_from_the_sun_surface() -> void:
 	var world := World.new()
 	world.apply(Effects.ServerPulse.new("graph"))

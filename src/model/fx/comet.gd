@@ -4,8 +4,10 @@
 
 class_name Comet
 extends RefCounted
+## A packet flying a bent path from `source` to `target`; its trail covers the last `TRAIL_TIME` seconds of that path.
 
-const TRAIL := 14
+const TRAIL_SEGMENTS := 13
+const TRAIL_TIME := TRAIL_SEGMENTS / 60.0
 
 var source: Callable
 var target: Callable
@@ -15,21 +17,14 @@ var duration: float
 var bend: float
 var on_arrive: Callable
 var age := 0.0
-var trail := PackedVector3Array()
 
 var progress: float:
 	get:
 		return minf(age / duration, 1.0)
 
-var position: Vector3:
+var tail: float:
 	get:
-		var start: Vector3 = source.call()
-		var end: Vector3 = target.call()
-		var span := end - start
-		var side := span.cross(Vector3.UP)
-		var control := (start + end) / 2.0 + side * bend + Vector3.UP * absf(bend) * span.length() * 0.5
-		var t := Electron.ease_in_out(progress)
-		return start.lerp(control, t).lerp(control.lerp(end, t), t)
+		return clampf((age - TRAIL_TIME) / duration, 0.0, 1.0)
 
 
 func _init(p_source: Callable, p_target: Callable, p_color: Color, p_size: float, p_duration: float, p_bend: float, p_on_arrive: Callable = Callable()) -> void:
@@ -42,11 +37,16 @@ func _init(p_source: Callable, p_target: Callable, p_color: Color, p_size: float
 	on_arrive = p_on_arrive
 
 
+func path() -> Basis:
+	var start: Vector3 = source.call()
+	var end: Vector3 = target.call()
+	var span := end - start
+	var control := (start + end) / 2.0 + span.cross(Vector3.UP) * bend + Vector3.UP * absf(bend) * span.length() * 0.5
+	return Basis(start, control, end)
+
+
 func update(dt: float) -> bool:
 	age += dt
-	trail.append(position)
-	if trail.size() > TRAIL:
-		trail.remove_at(0)
 	if age < duration:
 		return true
 	if on_arrive.is_valid():

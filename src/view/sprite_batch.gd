@@ -98,6 +98,12 @@ func _tint(i: int, color: Color, custom: Color) -> void:
 	_buffer[i + 19] = custom.a
 
 
+func mirror(source: SpriteBatch) -> void:
+	_buffer = source._buffer
+	_count = source._count
+	commit()
+
+
 func commit() -> void:
 	var capacity := _buffer.size() / STRIDE
 	if multimesh.instance_count != capacity:
