@@ -4,9 +4,11 @@
 
 class_name Flare
 extends RefCounted
-## A prominence loop rising from the sun surface and falling back.
+## A prominence loop whose plasma climbs both legs from the surface, holds, then rains back down.
 
 const FOOTPOINTS := 0.9
+const CLIMB := 0.35
+const DRAIN := 0.6
 
 var root: Vector3
 var tangent: Vector3
@@ -19,7 +21,14 @@ var age := 0.0
 
 var fade: float:
 	get:
-		return clampf(minf(age / (life * 0.15), (1.0 - age / life) * 3.0), 0.0, 1.0)
+		return clampf(minf(age / (life * 0.08), (1.0 - age / life) / 0.08), 0.0, 1.0)
+
+var reach: float:
+	get:
+		var t := age / life
+		if t < DRAIN:
+			return 1.0 - pow(1.0 - minf(t / CLIMB, 1.0), 2.0)
+		return 1.0 - pow(minf((t - DRAIN) / (1.0 - DRAIN), 1.0), 2.0)
 
 var growth: float:
 	get:

@@ -708,6 +708,22 @@ func test_flare_frame_carries_the_arc_for_the_gpu() -> void:
 		check((flare.frame() * local).is_equal_approx(arc[i]), "point %d" % i)
 
 
+func test_flare_plasma_climbs_the_legs_and_drains_back_down() -> void:
+	var flare := Flare.new(Vector3.UP, 7.0, 1.5, Color.RED, 10.0)
+	var reaches := []
+	for i in 10:
+		reaches.append(flare.reach)
+		flare.update(1.0)
+	equal(reaches[0], 0.0)
+	check(reaches[1] < reaches[2] and reaches[2] < reaches[3], "climbs: %s" % [reaches])
+	equal(reaches[5], 1.0)
+	check(reaches[7] > reaches[8] and reaches[8] > reaches[9], "drains: %s" % [reaches])
+	check(reaches[7] - reaches[8] < reaches[8] - reaches[9], "drain speeds up as it falls: %s" % [reaches])
+	var draining := Flare.new(Vector3.UP, 7.0, 1.5, Color.RED, 10.0)
+	draining.update(8.5)
+	check(draining.fade > 0.5, "footpoints still glow while the loop drains")
+
+
 func test_flare_footpoints_widen_with_height() -> void:
 	var low := Flare.new(Vector3.UP, 7.0, 0.3, Color.RED, 5.0)
 	var tall := Flare.new(Vector3.UP, 7.0, 3.0, Color.RED, 5.0)

@@ -308,7 +308,7 @@ func _server(world: World) -> void:
 			var width := clampf(flare.height * 0.12, 0.06, 0.35)
 			for strand in STRANDS.size():
 				var seed := float(flare.get_instance_id() % 97 + strand * 31) / 128.0
-				prominences.add_frame(frame, Vector3.ZERO, Color(0, 0, seed, flare.fade), Color(flare.spread, flare.lifted(STRANDS[strand]), width, 0))
+				prominences.add_frame(frame, Vector3.ZERO, Color(0, 0, seed, flare.fade), Color(flare.spread, flare.lifted(STRANDS[strand]), width, flare.reach))
 
 
 func _caches(world: World) -> void:
