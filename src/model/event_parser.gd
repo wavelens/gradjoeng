@@ -132,6 +132,9 @@ static func _directory(name: String, content: Dictionary) -> Array:
 	if name == "directory.caches":
 		var caches: Variant = content.get("caches")
 		return [Effects.CachesListed.new(caches)] if caches is Dictionary else []
+	if name == "directory.jobs":
+		var jobs: Variant = content.get("jobs")
+		return jobs.map(func(job: Dictionary): return Effects.JobDispatched.new(text(job, "worker_id"), text(job, "evaluation_id"), text(job, "build_id"), number(job, "score"))) if jobs is Array else []
 	var names: Variant = content.get("names")
 	return [Effects.Names.new(names)] if names is Dictionary else []
 

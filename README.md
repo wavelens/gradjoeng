@@ -50,6 +50,7 @@ With `--url`, Gradjöng reads:
 - `api/v1/board/network`: proto traffic rate and average worker throughput (`UTIL`)
 - `api/v1/caches`: all caches, idle ones included
 - `api/v1/projects/{project}/workers` and `api/v1/evals/{evaluation}`: worker and evaluation names
+- `api/v1/board/jobs/dispatched`: evaluation of build jobs whose dispatch the stream did not show
 
 ## Controls
 

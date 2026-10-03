@@ -37,6 +37,26 @@ func test_evaluation_names_from_evaluation_record() -> void:
 	equal(NameDirectory.evaluation_names("e1", "garbage"), {})
 
 
+func test_build_job_from_job_message() -> void:
+	equal(NameDirectory.build_job({"event": "proto.client.job_update", "content": {"job_id": "build:d1"}}), "d1")
+	equal(NameDirectory.build_job({"event": "proto.client.log_chunk", "content": {"job_id": "eval:e1"}}), "")
+	equal(NameDirectory.build_job({"event": "proto.client.request_job", "content": {"job_id": null}}), "")
+
+
+func test_build_dispatches_from_dispatched_jobs() -> void:
+	var body := JSON.stringify({"error": false, "message": {"other_running": 0, "jobs": [
+		{"id": "j1", "kind": 1, "worker_id": "w1", "score": 3.0, "build_id": "d1", "evaluation_id": "e2"},
+		{"id": "j2", "kind": 0, "worker_id": "w2", "score": 1.0, "build_id": null, "evaluation_id": "e3"},
+	]}})
+	equal(NameDirectory.build_dispatches(body), [{"worker_id": "w1", "evaluation_id": "e2", "build_id": "d1", "score": 3.0}])
+	equal(NameDirectory.build_dispatches("garbage"), [])
+
+
+func test_jobs_event_lists_dispatches() -> void:
+	var jobs := [{"worker_id": "w1", "evaluation_id": "e2", "build_id": "d1", "score": 3.0}]
+	equal(NameDirectory.jobs_event(jobs), {"event": "directory.jobs", "content": {"jobs": jobs}})
+
+
 func test_unnamed_evaluation_needs_lookup_only_without_repository() -> void:
 	equal(NameDirectory.unnamed_evaluation({"event": "evaluation.started", "content": {"evaluation_id": "e1", "repository": null}}), "e1")
 	equal(NameDirectory.unnamed_evaluation({"event": "worker.job_dispatched", "content": {"evaluation_id": "e1"}}), "e1")

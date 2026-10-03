@@ -4,7 +4,7 @@
 
 class_name NameDirectory
 extends Node
-## Lists caches as `directory.caches` and resolves worker and evaluation ids to display names as `directory.names` events.
+## Lists caches as `directory.caches`, resolves worker and evaluation ids to display names as `directory.names` and build jobs to their evaluation as `directory.jobs` events.
 
 signal event_received(event: Dictionary)
 
@@ -12,11 +12,13 @@ const REFRESH := 60.0
 const CACHES_PATH := "api/v1/caches?per_page=100"
 const PROJECTS_PATH := "api/v1/projects?per_page=100"
 const EVALUATION_PATH := "api/v1/evals/%s"
+const DISPATCHED_JOBS_PATH := "api/v1/board/jobs/dispatched"
 
 var _base: String
 var _headers: PackedStringArray
 var _timer := Timer.new()
 var _evaluations := {}
+var _assigned_builds := {}
 
 
 func _init(base: String, token: String) -> void:
@@ -71,6 +73,26 @@ static func unnamed_evaluation(event: Dictionary) -> String:
 	return evaluation if evaluation is String else ""
 
 
+static func jobs_event(jobs: Array) -> Dictionary:
+	return {"event": "directory.jobs", "content": {"jobs": jobs}}
+
+
+static func build_job(event: Dictionary) -> String:
+	var content: Variant = event.get("content")
+	var job: Variant = content.get("job_id") if content is Dictionary else null
+	return job.trim_prefix("build:") if job is String and job.begins_with("build:") else ""
+
+
+static func build_dispatches(body: String) -> Array:
+	var message: Variant = _message(body)
+	var jobs: Variant = message.get("jobs") if message is Dictionary else null
+	var dispatches := []
+	for job in jobs if jobs is Array else []:
+		if job is Dictionary and job.get("build_id") is String and job.get("evaluation_id") is String and job.get("worker_id") is String:
+			dispatches.append({"worker_id": job["worker_id"], "evaluation_id": job["evaluation_id"], "build_id": job["build_id"], "score": job.get("score", 0.0)})
+	return dispatches
+
+
 static func worker_names(body: String) -> Dictionary:
 	var workers: Variant = _message(body)
 	var names := {}
@@ -93,11 +115,31 @@ static func _items(body: String) -> Array:
 
 
 func observe(event: Dictionary) -> void:
-	var evaluation := unnamed_evaluation(event)
+	_name_evaluation(unnamed_evaluation(event))
+	_resolve_build_job(event)
+
+
+func _name_evaluation(evaluation: String) -> void:
 	if not evaluation or _evaluations.has(evaluation):
 		return
 	_evaluations[evaluation] = true
 	_fetch(EVALUATION_PATH % evaluation.uri_encode(), func(body: String) -> void: _publish(evaluation_names(evaluation, body)))
+
+
+func _resolve_build_job(event: Dictionary) -> void:
+	var content: Variant = event.get("content")
+	if event.get("event") == "worker.job_dispatched" and content is Dictionary and content.get("build_id") is String:
+		_assigned_builds[content["build_id"]] = true
+	var build := build_job(event)
+	if not build or _assigned_builds.has(build):
+		return
+	_assigned_builds[build] = true
+	_fetch(DISPATCHED_JOBS_PATH, func(body: String) -> void:
+		var dispatches := build_dispatches(body)
+		for dispatch in dispatches:
+			_assigned_builds[dispatch["build_id"]] = true
+		if not dispatches.is_empty():
+			event_received.emit(jobs_event(dispatches)))
 
 
 func _refresh() -> void:

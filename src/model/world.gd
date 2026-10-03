@@ -52,6 +52,7 @@ var caches := {}
 var build_owner := {}
 var derivations := {}
 var dispatched := {}
+var assigned_evaluation := {}
 var uploader := ""
 var names := {}
 var offers := {}
@@ -289,6 +290,7 @@ func _build_changed(change: Effects.BuildChanged) -> void:
 		_send_build_home(evaluation, build)
 	if build.finished:
 		dispatched.erase(build.derivation_build)
+		assigned_evaluation.erase(build.derivation_build)
 	build.flash = 1.0
 	evaluation.idle = 0.0
 	evaluation.flash = maxf(evaluation.flash, 0.5)
@@ -330,6 +332,7 @@ func _dispatch(dispatch: Effects.JobDispatched) -> void:
 		offers[worker.id].score = dispatch.score
 	if dispatch.derivation_build:
 		dispatched[dispatch.derivation_build] = worker.id
+		_assign(dispatch.derivation_build, dispatch.evaluation_id)
 		_board_derivation(dispatch.derivation_build, worker)
 	elif dispatch.evaluation_id:
 		var evaluation := _evaluation(dispatch.evaluation_id)
@@ -364,9 +367,7 @@ func _job_evaluation(job_id: String) -> Bodies.Evaluation:
 		"eval":
 			return evaluations.get(id)
 		"build":
-			var linked := _builds_of(id)
-			if linked:
-				return evaluations.get(build_owner[linked[0].id])
+			return evaluations.get(assigned_evaluation.get(id, ""))
 	return null
 
 
@@ -376,13 +377,24 @@ func _start(evaluation: Bodies.Evaluation) -> void:
 
 
 func _board_derivation(derivation_build: String, worker: Bodies.Worker) -> void:
-	var live := _builds_of(derivation_build).filter(func(build: Bodies.Build): return not build.finished)
-	if live.is_empty():
-		return
-	var aboard := live.filter(func(build: Bodies.Build): return build.electron.host.begins_with("worker:"))
-	var carrier: Bodies.Build = aboard[0] if aboard else live[0]
-	if carrier.electron.host != worker_host(worker.id):
-		_board(carrier, worker)
+	var build := _assigned_build(derivation_build)
+	if build and not build.finished and build.electron.host != worker_host(worker.id):
+		_board(build, worker)
+
+
+func _assign(derivation_build: String, evaluation_id: String) -> void:
+	var previous := _assigned_build(derivation_build)
+	assigned_evaluation[derivation_build] = evaluation_id
+	if previous and build_owner[previous.id] != evaluation_id:
+		_send_build_home(evaluations[build_owner[previous.id]], previous)
+
+
+func _assigned_build(derivation_build: String) -> Bodies.Build:
+	var owner: String = assigned_evaluation.get(derivation_build, "")
+	for build in _builds_of(derivation_build):
+		if build_owner[build.id] == owner:
+			return build
+	return null
 
 
 func _builds_of(derivation_build: String) -> Array:

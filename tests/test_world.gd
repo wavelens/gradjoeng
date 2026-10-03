@@ -184,6 +184,42 @@ func test_shared_derivation_build_sends_one_build_to_the_worker() -> void:
 	check(not world.evaluations["e1"].builds.has("d1"), "no phantom build")
 
 
+func test_shared_derivation_build_boards_the_build_of_its_assigned_evaluation() -> void:
+	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(queued("e2"))
+	world.apply(Effects.BuildChanged.new("b1", "e1", "building", "d1"))
+	world.apply(Effects.BuildChanged.new("b2", "e2", "building", "d1"))
+	world.apply(Effects.JobDispatched.new("w1", "e2", "d1"))
+	equal(world.evaluations["e1"].builds["b1"].electron.host, "evaluation:e1")
+	equal(world.evaluations["e2"].builds["b2"].electron.host, "worker:w1")
+
+
+func test_reassigned_derivation_build_sends_the_previous_build_home() -> void:
+	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(queued("e2"))
+	world.apply(Effects.BuildChanged.new("b1", "e1", "building", "d1"))
+	world.apply(Effects.BuildChanged.new("b2", "e2", "building", "d1"))
+	world.apply(Effects.JobDispatched.new("w1", "e1", "d1"))
+	world.apply(Effects.JobDispatched.new("w2", "e2", "d1"))
+	equal(world.evaluations["e1"].builds["b1"].electron.host, "evaluation:e1")
+	equal(world.evaluations["e2"].builds["b2"].electron.host, "worker:w2")
+
+
+func test_nar_push_of_shared_derivation_build_uploads_for_its_assigned_evaluation() -> void:
+	var world := World.new()
+	world.apply(queued("e1"))
+	world.apply(queued("e2"))
+	world.apply(Effects.BuildChanged.new("b1", "e1", "building", "d1"))
+	world.apply(Effects.BuildChanged.new("b2", "e2", "building", "d1"))
+	world.apply(Effects.JobDispatched.new("w1", "e2", "d1"))
+	world.apply(Effects.WorkerMessage.new("w1", false, "nar_push", 10, "build:d1"))
+	world.apply(Effects.CacheStored.new("c1"))
+	equal(world.evaluations["e1"].uploads.keys(), [])
+	equal(world.evaluations["e2"].uploads.keys(), ["c1"])
+
+
 func test_shared_derivation_build_redispatch_moves_the_same_build() -> void:
 	var world := World.new()
 	world.apply(queued("e1"))
@@ -472,6 +508,7 @@ func test_substituted_build_comes_only_from_caches_the_evaluation_uploaded_to() 
 	var world := World.new()
 	world.apply(queued("e1"))
 	world.apply(Effects.BuildChanged.new("b0", "e1", "building", "d0"))
+	world.apply(Effects.JobDispatched.new("w1", "e1", "d0"))
 	for cache in ["c1", "c2", "c3"]:
 		world.apply(Effects.CacheAccess.new(cache, "narinfo", true, 0))
 	world.apply(Effects.WorkerMessage.new("w1", false, "nar_push", 10, "build:d0"))
@@ -557,12 +594,17 @@ func test_finished_evaluation_ignores_late_job_message() -> void:
 	equal(world.evaluations["e1"].electron.host, World.SERVER)
 
 
-func test_building_build_boards_worker_from_job_message() -> void:
+func test_job_message_of_unassigned_build_waits_for_its_evaluation() -> void:
 	var world := World.new()
 	world.apply(queued("e1"))
+	world.apply(queued("e2"))
 	world.apply(Effects.BuildChanged.new("b1", "e1", "building", "d1"))
+	world.apply(Effects.BuildChanged.new("b2", "e2", "building", "d1"))
 	world.apply(Effects.WorkerMessage.new("w1", false, "job_update", 10, "build:d1"))
-	equal(world.evaluations["e1"].builds["b1"].electron.host, World.worker_host("w1"))
+	var hosts := world.electrons().map(func(e: Electron): return e.host).filter(func(h: String): return h.begins_with("worker:"))
+	equal(hosts, [])
+	world.apply(Effects.JobDispatched.new("w1", "e2", "d1"))
+	equal(world.evaluations["e2"].builds["b2"].electron.host, World.worker_host("w1"))
 
 
 func test_average_worker_network_ignores_workers_without_samples() -> void:

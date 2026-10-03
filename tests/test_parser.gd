@@ -146,6 +146,14 @@ func test_directory_names_become_name_effects() -> void:
 	equal(EventParser.parse(ev("directory.names", {"names": "nope"})), [])
 
 
+func test_directory_jobs_become_quiet_dispatches() -> void:
+	var effects := EventParser.parse(ev("directory.jobs", {"jobs": [{"worker_id": "w1", "evaluation_id": "e1", "build_id": "d1", "score": 3.0}]}))
+	var dispatch: Effects.JobDispatched = only(effects)
+	equal([dispatch.worker_id, dispatch.evaluation_id, dispatch.derivation_build], ["w1", "e1", "d1"])
+	near(dispatch.score, 3.0)
+	equal(EventParser.parse(ev("directory.jobs", {"jobs": "nope"})), [])
+
+
 func test_directory_caches_become_listed_caches() -> void:
 	var listed: Effects.CachesListed = only(EventParser.parse(ev("directory.caches", {"caches": {"c1": "main"}})))
 	equal(listed.caches, {"c1": "main"})
