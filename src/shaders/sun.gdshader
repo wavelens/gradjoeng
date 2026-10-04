@@ -35,8 +35,9 @@ vec3 convection(vec3 p, float time) {
 	return nearest;
 }
 
-vec3 flow(vec3 p) {
-	return vec3(fbm3(p * 1.7 + 3.1), fbm3(p * 1.7 + 17.9), fbm3(p * 1.7 + 41.3)) - 0.5;
+vec3 flow(vec3 p, float time) {
+	vec3 q = p * 1.7 + time;
+	return vec3(fbm3(q + 3.1), fbm3(q + 17.9), fbm3(q + 41.3)) - 0.5;
 }
 
 float temperature(vec3 p, float time) {
@@ -66,10 +67,7 @@ void fragment() {
 	float spin = TIME * rotation;
 	vec3 p = vec3(cos(spin) * local.x - sin(spin) * local.z, local.y, sin(spin) * local.x + cos(spin) * local.z);
 
-	float phase = fract(TIME * flow_speed);
-	vec3 drift = flow(p);
-	float blend = abs(phase * 2.0 - 1.0);
-	float heat = mix(temperature(p + drift * phase * 0.12, TIME), temperature(p + drift * fract(phase + 0.5) * 0.12 + 0.37, TIME), blend);
+	float heat = temperature(p + flow(p, TIME * flow_speed) * 0.06, TIME);
 
 	float spots = smoothstep(0.62, 0.72, fbm3(p * 1.8 + vec3(4.0, 1.5, TIME * 0.002)));
 	heat *= 1.0 - spots * 0.8;
