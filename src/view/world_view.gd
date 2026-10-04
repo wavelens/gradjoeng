@@ -124,7 +124,7 @@ func _environment() -> WorldEnvironment:
 	environment.sky = Sky.new()
 	environment.sky.sky_material = sky_material
 	environment.tonemap_mode = Environment.TONE_MAPPER_AGX
-	environment.tonemap_exposure = 1.3
+	environment.tonemap_exposure = 5.2
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = AMBIENT
 	environment.ambient_light_energy = 0.35
@@ -139,18 +139,7 @@ func _environment() -> WorldEnvironment:
 		environment.set_glow_level(level, GLOW_LEVELS[level])
 	var node := WorldEnvironment.new()
 	node.environment = environment
-	node.camera_attributes = _auto_exposure()
 	return node
-
-
-func _auto_exposure() -> CameraAttributesPractical:
-	var attributes := CameraAttributesPractical.new()
-	attributes.auto_exposure_enabled = true
-	attributes.auto_exposure_min_sensitivity = 80.0
-	attributes.auto_exposure_max_sensitivity = 320.0
-	attributes.auto_exposure_scale = 0.3
-	attributes.auto_exposure_speed = 0.6
-	return attributes
 
 
 func _lens() -> CanvasLayer:
