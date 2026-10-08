@@ -24,6 +24,7 @@ varying float heat;
 varying vec3 light;
 varying float offline;
 varying float loaded;
+varying float cpu;
 
 float bayer(vec2 pixel) {
 	int index = int(mod(pixel.x, 4.0)) + int(mod(pixel.y, 4.0)) * 4;
@@ -35,14 +36,15 @@ vec3 turn(vec3 p, float angle) {
 	return vec3(cos(angle) * p.x - sin(angle) * p.z, p.y, sin(angle) * p.x + cos(angle) * p.z);
 }
 
-vec3 terrain(vec3 ground, float height, float land) {
+vec3 terrain(vec3 ground, float height, float land, float sea) {
 	vec3 origin = ground * 2.0 + seed * 23.0;
-	vec3 ocean = mix(vec3(0.01, 0.04, 0.16), vec3(0.03, 0.2, 0.4), smoothstep(SEA - 0.14, SEA, height));
+	vec3 ocean = mix(vec3(0.01, 0.04, 0.16), vec3(0.03, 0.2, 0.4), smoothstep(sea - 0.14, sea, height));
 	float dry = fbm3(origin * 1.4 + 5.0) + (1.0 - abs(ground.y)) * 0.12;
 	vec3 lowland = mix(vec3(0.07, 0.3, 0.09), vec3(0.58, 0.46, 0.22), smoothstep(0.5, 0.66, dry));
 	vec3 ground_color = mix(lowland, vec3(0.4, 0.34, 0.3), smoothstep(SEA + 0.1, SEA + 0.22, height));
 	vec3 color = mix(ocean, ground_color, land);
-	float ice = smoothstep(0.74, 0.8, abs(ground.y) + 0.2 * (fbm3(origin * 4.0) - 0.5));
+	float ice_line = 0.74 + 0.18 * cpu;
+	float ice = smoothstep(ice_line, ice_line + 0.06, abs(ground.y) + 0.2 * (fbm3(origin * 4.0) - 0.5));
 	return mix(color, vec3(0.9, 0.94, 1.0), ice);
 }
 
@@ -61,7 +63,8 @@ void vertex() {
 	seed = INSTANCE_CUSTOM.x;
 	heat = INSTANCE_CUSTOM.y;
 	offline = INSTANCE_CUSTOM.z;
-	loaded = INSTANCE_CUSTOM.w;
+	loaded = step(0.0, INSTANCE_CUSTOM.w);
+	cpu = max(INSTANCE_CUSTOM.w, 0.0);
 }
 
 vec2 torn(vec2 uv) {
@@ -85,8 +88,9 @@ void fragment() {
 	vec3 ground = turn(normal, TIME * spin + seed * 6.2831853);
 	vec3 origin = ground * 2.0 + seed * 23.0;
 	float height = fbm3(origin) * 0.75 + fbm3(origin * 3.1) * 0.35;
-	float land = smoothstep(SEA, SEA + 0.015, height);
-	vec3 surface = terrain(ground, height, land);
+	float sea = SEA + 0.12 * cpu;
+	float land = smoothstep(sea, sea + 0.015, height);
+	vec3 surface = terrain(ground, height, land, sea);
 
 	vec3 sky = turn(normal, TIME * spin * 1.7 + seed * 6.2831853 + 1.3);
 	float cloud = smoothstep(0.52, 0.78, fbm3(sky * 3.2 + seed * 11.0 + vec3(0.0, 0.0, TIME * 0.015)));

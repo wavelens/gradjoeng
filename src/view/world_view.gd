@@ -335,7 +335,7 @@ func _workers(world: World) -> void:
 		var pulse := 0.5 + 0.5 * sin(world.time * 3.0 + at.x)
 		var behind := at + (at - eye).normalized() * WORKER_RADIUS
 		glows.add(behind, 1.9 + heat * 0.85 + pulse * 0.14, Palette.shade(color.lerp(Palette.ATMOSPHERE, 0.5), (0.7 + heat * 0.6) * 0.3))
-		planets.add(at, WORKER_RADIUS, color, Color(planet_seed(worker.id), heat, offline, 0.0 if worker.cpu == null else 1.0))
+		planets.add(at, WORKER_RADIUS, color, Color(planet_seed(worker.id), heat, offline, -1.0 if worker.cpu == null else worker.smoothed_cpu))
 		var label := world.worker_label(worker)
 		if worker.cpu != null and worker.connected:
 			label += "  %d%%" % roundi(worker.cpu)

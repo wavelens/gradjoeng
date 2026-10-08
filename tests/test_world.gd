@@ -645,6 +645,21 @@ func test_worker_load_sets_cpu_and_overload_throws_sparks() -> void:
 	check(sparked, "sparks")
 
 
+func test_smoothed_cpu_eases_toward_load_instead_of_jumping() -> void:
+	var world := World.new()
+	world.apply(Effects.WorkerLoad.new("w1", 80.0))
+	var worker: Bodies.Worker = world.workers["w1"]
+	world.update(0.1)
+	check(worker.smoothed_cpu > 0.0 and worker.smoothed_cpu < 0.4, "rising: %s" % worker.smoothed_cpu)
+	for i in 200:
+		world.update(0.05)
+	check(absf(worker.smoothed_cpu - 0.8) < 0.01, "settled: %s" % worker.smoothed_cpu)
+	world.apply(Effects.WorkerLoad.new("w1", null))
+	for i in 200:
+		world.update(0.05)
+	check(worker.smoothed_cpu < 0.01, "cooled: %s" % worker.smoothed_cpu)
+
+
 func test_retired_evaluations_are_freed() -> void:
 	var world := World.new()
 	world.apply(queued("e1"))

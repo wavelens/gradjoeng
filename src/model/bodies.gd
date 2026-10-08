@@ -19,6 +19,7 @@ class Worker:
 	var heat := 1.0
 	var position := Vector3.ZERO
 	var cpu: Variant = null
+	var smoothed_cpu := 0.0
 	var network: Variant = null
 	var connected := true
 	var link := 1.0

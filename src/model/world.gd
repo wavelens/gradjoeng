@@ -629,6 +629,7 @@ func _update_workers(dt: float) -> void:
 	for worker in workers.values():
 		worker.angle += wrapf(worker.target - worker.angle, -PI, PI) * minf(dt * 2.5, 1.0)
 		worker.heat *= pow(0.25, dt)
+		worker.smoothed_cpu = lerpf(0.0 if worker.cpu == null else worker.cpu / 100.0, worker.smoothed_cpu, pow(0.3, dt))
 		worker.link = move_toward(worker.link, 1.0 if worker.connected else 0.0, dt / LINK_FADE)
 		_place_worker(worker)
 		if worker.unstable and randf() < dt * UNSTABLE_SPARK_RATE:
