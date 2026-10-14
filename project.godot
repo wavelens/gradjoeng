@@ -28,5 +28,7 @@ display_server/driver.linuxbsd="wayland"
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+rendering_device/driver.macos="vulkan"
+textures/vram_compression/import_etc2_astc=true
 anti_aliasing/quality/msaa_3d=2
 anti_aliasing/quality/screen_space_aa=2
