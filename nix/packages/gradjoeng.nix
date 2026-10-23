@@ -108,12 +108,12 @@ stdenvNoCC.mkDerivation {
           mkdir -p $out/nix-support
           echo "file binary-dist $out/share/gradjoeng/gradjoeng" >> $out/nix-support/hydra-build-products
           makeWrapper $out/share/gradjoeng/gradjoeng $out/bin/gradjoeng \
-            --add-flags "--"
+            --add-flags "--" \
         ''
     else ''
       install -Dm644 build/gradjoeng.pck $out/share/gradjoeng/gradjoeng.pck
       makeWrapper ${lib.getExe godot} $out/bin/gradjoeng \
-        --add-flags "--main-pack $out/share/gradjoeng/gradjoeng.pck --"
+        --add-flags "--main-pack $out/share/gradjoeng/gradjoeng.pck --" \
     ''
     )
     + lib.optionalString (!isDarwin) ''
