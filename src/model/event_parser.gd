@@ -30,7 +30,36 @@ static func parse(event: Dictionary) -> Array:
 			return _cache(name, content)
 		"directory":
 			return _directory(name, content)
+		"vm":
+			return _vm(content)
+		"exec_job":
+			return _exec_job(name, content)
 	return [Effects.Headline.new(name, "info")]
+
+
+static func exec_key(job: String) -> String:
+	return "exec:%s" % job if job else ""
+
+
+static func _vm(content: Dictionary) -> Array:
+	var worker := text(content, "worker_id")
+	var vm := text(content, "vm")
+	if not worker or not vm:
+		return []
+	return [Effects.VmChanged.new(worker, vm, text(content, "state"), exec_key(text(content, "exec_job")))]
+
+
+static func _exec_job(name: String, content: Dictionary) -> Array:
+	var job := text(content, "job")
+	if not job:
+		return []
+	var state := suffix(name)
+	state = "running" if state == "started" else state
+	var label := text(content, "entry_point_name")
+	var effects: Array = [Effects.ExecJobChanged.new(exec_key(job), text(content, "evaluation"), state, label)]
+	if state != "phase":
+		effects.append(Effects.Headline.new("exec       %s {0}" % state.rpad(10), tone_of(state), job, label if label else short(job)))
+	return effects
 
 
 static func tone_of(state: String) -> String:

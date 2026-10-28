@@ -73,6 +73,32 @@ class BuildChanged:
 		derivation_build = p_derivation_build
 
 
+class VmChanged:
+	var worker_id: String
+	var vm: String
+	var state: String
+	var job_id: String
+
+	func _init(p_worker_id: String, p_vm: String, p_state: String, p_job_id: String = "") -> void:
+		worker_id = p_worker_id
+		vm = p_vm
+		state = p_state
+		job_id = p_job_id
+
+
+class ExecJobChanged:
+	var job_id: String
+	var evaluation_id: String
+	var state: String
+	var label: String
+
+	func _init(p_job_id: String, p_evaluation_id: String, p_state: String, p_label: String = "") -> void:
+		job_id = p_job_id
+		evaluation_id = p_evaluation_id
+		state = p_state
+		label = p_label
+
+
 class JobDispatched:
 	var worker_id: String
 	var evaluation_id: String

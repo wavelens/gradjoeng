@@ -84,6 +84,30 @@ class Build:
 		electron = p_electron
 
 
+class Vm:
+	var id: String
+	var worker_id: String
+	var job_id := ""
+	var lit := false
+	var synthetic := false
+	var color := Color.WHITE
+	var electron: Electron
+	var flash := 1.0
+	var link := 1.0
+	var alpha := 1.0
+	var fading := false
+	var linger := -1.0
+
+	var position: Vector3:
+		get:
+			return electron.position
+
+	func _init(p_id: String, p_worker_id: String, p_electron: Electron) -> void:
+		id = p_id
+		worker_id = p_worker_id
+		electron = p_electron
+
+
 class Shard:
 	var worker_id: String
 	var electron: Electron

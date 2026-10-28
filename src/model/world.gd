@@ -49,6 +49,8 @@ var drought := 0.0
 var workers := {}
 var evaluations := {}
 var caches := {}
+var vms := {}
+var exec_jobs := {}
 var build_owner := {}
 var derivations := {}
 var dispatched := {}
@@ -85,17 +87,21 @@ func apply(effect: Variant) -> void:
 			uploader = effect.job_id
 		_pace(effect)
 	elif effect is Effects.WorkerLoad:
-		_worker(effect.worker_id).cpu = effect.cpu
+		worker_body(effect.worker_id).cpu = effect.cpu
 	elif effect is Effects.WorkerLink:
-		_worker(effect.worker_id).connected = effect.connected
+		worker_body(effect.worker_id).connected = effect.connected
 	elif effect is Effects.WorkerNetwork:
-		_worker(effect.worker_id).network = effect.mbps
+		worker_body(effect.worker_id).network = effect.mbps
 	elif effect is Effects.EvaluationChanged:
 		_evaluation_changed(effect)
 	elif effect is Effects.BuildChanged:
 		_build_changed(effect)
 	elif effect is Effects.JobDispatched:
 		_dispatch(effect)
+	elif effect is Effects.VmChanged:
+		VmMoons.vm_changed(self, effect)
+	elif effect is Effects.ExecJobChanged:
+		VmMoons.exec_job_changed(self, effect)
 	elif effect is Effects.ServerPulse:
 		_pulse(effect.kind)
 	elif effect is Effects.CacheAccess:
@@ -122,6 +128,7 @@ func update(dt: float) -> void:
 	drought += dt
 	_update_workers(dt)
 	_update_evaluations(dt)
+	VmMoons.update(self, dt)
 	for cache in caches.values():
 		cache.flash *= pow(0.1, dt)
 		cache.alarm *= pow(0.2, dt)
@@ -162,6 +169,7 @@ func electrons() -> Array:
 		result.append(evaluation.electron)
 		result.append_array(evaluation.builds.values().map(func(build): return build.electron))
 		result.append_array(evaluation.shards.values().map(func(shard): return shard.electron))
+	result.append_array(vms.values().map(func(moon): return moon.electron))
 	return result
 
 
@@ -211,7 +219,7 @@ func _release() -> void:
 
 
 func _message(message: Effects.WorkerMessage) -> void:
-	var worker := _worker(message.worker_id)
+	var worker := worker_body(message.worker_id)
 	var line := "{0}  %s  %s" % ["->" if message.outbound else "<-", message.kind]
 	if message.size > 0:
 		line += "  " + byte_size(message.size)
@@ -229,6 +237,8 @@ func _message(message: Effects.WorkerMessage) -> void:
 		_answer(worker)
 		return
 	if fx.size() > MAX_FX:
+		return
+	if VmMoons.exec_message(self, message, worker):
 		return
 	var at_worker := func() -> Vector3: return worker.position
 	var source: Callable = server_position if message.outbound else at_worker
@@ -287,7 +297,7 @@ func _build_changed(change: Effects.BuildChanged) -> void:
 		return
 	build.state = change.state
 	if change.state == "building" and dispatched.has(build.derivation_build):
-		_board_derivation(build.derivation_build, _worker(dispatched[build.derivation_build]))
+		_board_derivation(build.derivation_build, worker_body(dispatched[build.derivation_build]))
 	elif change.state != "building":
 		_send_build_home(evaluation, build)
 	if build.finished:
@@ -328,7 +338,7 @@ func _substitution_source(evaluation: Bodies.Evaluation, build: Bodies.Build) ->
 
 
 func _dispatch(dispatch: Effects.JobDispatched) -> void:
-	var worker := _worker(dispatch.worker_id)
+	var worker := worker_body(dispatch.worker_id)
 	worker.heat = 1.0
 	if offers.has(worker.id):
 		offers[worker.id].score = dispatch.score
@@ -549,7 +559,7 @@ func _place_caches() -> void:
 		caches[ids[index]].position = CACHE_ARC_CENTER + Vector3(-cos(angle), 0.0, -sin(angle)) * radius
 
 
-func _worker(worker_id: String) -> Bodies.Worker:
+func worker_body(worker_id: String) -> Bodies.Worker:
 	if not workers.has(worker_id):
 		workers[worker_id] = Bodies.Worker.new(worker_id, randf() * TAU, time)
 		var ids := workers.keys()

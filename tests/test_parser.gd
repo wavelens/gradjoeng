@@ -158,3 +158,17 @@ func test_directory_caches_become_listed_caches() -> void:
 	var listed: Effects.CachesListed = only(EventParser.parse(ev("directory.caches", {"caches": {"c1": "main"}})))
 	equal(listed.caches, {"c1": "main"})
 	equal(EventParser.parse(ev("directory.caches", {"caches": []})), [])
+
+
+func test_vm_state_names_its_exec_job_key() -> void:
+	var change: Effects.VmChanged = only(EventParser.parse(ev("vm.state", {"worker_id": "w1", "vm": "v1", "state": "running", "exec_job": "j1"})))
+	equal([change.worker_id, change.vm, change.state, change.job_id], ["w1", "v1", "running", "exec:j1"])
+	equal(only(EventParser.parse(ev("vm.state", {"worker_id": "w1", "vm": "v1", "state": "warm", "exec_job": null}))).job_id, "")
+
+
+func test_exec_job_events_become_exec_job_changes() -> void:
+	var effects := EventParser.parse(ev("exec_job.started", {"job": "j1", "evaluation": "e1", "status": 2.0, "entry_point_name": "train"}))
+	var change: Effects.ExecJobChanged = effects[0]
+	equal([change.job_id, change.evaluation_id, change.state, change.label], ["exec:j1", "e1", "running", "train"])
+	check(effects[1] is Effects.Headline, "headline follows")
+	equal(EventParser.parse(ev("exec_job.phase", {"job": "j1", "evaluation": "e1", "phase": "epoch-3"}))[0].state, "phase")
