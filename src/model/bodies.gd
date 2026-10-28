@@ -111,7 +111,7 @@ class Evaluation:
 			if electron.host.begins_with("worker:"):
 				return true
 			for build in builds.values():
-				if build.state == "building":
+				if build.state == "building" or build.electron.host.begins_with("worker:"):
 					return true
 			return false
 

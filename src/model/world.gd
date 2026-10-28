@@ -359,6 +359,9 @@ func _claim(job_id: String, worker: Bodies.Worker) -> void:
 		"build":
 			dispatched[id] = worker.id
 			_board_derivation(id, worker)
+			var owner := _job_evaluation(job_id)
+			if owner:
+				owner.idle = 0.0
 
 
 func _job_evaluation(job_id: String) -> Bodies.Evaluation:
