@@ -31,6 +31,8 @@ const ORBIT_WIDTH := 0.035
 const WORKER_RADIUS := 1.2
 const EVALUATION_RADIUS := 0.36
 const BUILD_RADIUS := 0.17
+const SHARD_RADIUS := 0.26
+const MOON_RADIUS := 0.5
 const CACHE_RADIUS := 2.0
 const SUNLIGHT := Color("ff6a3d")
 const AMBIENT := Color("8fa3c8")
@@ -99,6 +101,7 @@ func draw(world: World, p_eye: Vector3) -> void:
 	_caches(world)
 	_workers(world)
 	_evaluations(world)
+	_vms(world)
 	_sparks(world)
 	glows.commit()
 	bodies.commit()
@@ -197,6 +200,10 @@ func _links(world: World) -> void:
 		var lit := flicker(worker.link)
 		if lit > 0.0:
 			_link(World.server_position(), worker.position, (0.5 + worker.heat) * lit)
+	for moon in world.vms.values():
+		var worker: Bodies.Worker = world.workers.get(moon.worker_id)
+		if worker:
+			_link(worker.position, moon.position, (0.3 + moon.link) * moon.alpha)
 
 
 static func flicker(progress: float) -> float:
@@ -241,6 +248,9 @@ func _orbits(world: World) -> void:
 		for build in evaluation.visible_builds():
 			if not build.electron.host.begins_with("evaluation:"):
 				_orbit_ring(build.electron, Color(Palette.shade(Palette.state(build.state), 0.06), evaluation.alpha))
+		for shard in evaluation.shards.values():
+			if not shard.merging:
+				_orbit_ring(shard.electron, Color(color, evaluation.alpha))
 
 
 func _orbit_ring(electron: Electron, color: Color) -> void:
@@ -361,10 +371,37 @@ func _evaluations(world: World) -> void:
 		glows.add(at, 0.48 + evaluation.flash * 0.68, Palette.shade(color, alpha * (0.6 + evaluation.flash * 0.8)))
 		bodies.add(at, EVALUATION_RADIUS, Color(color, alpha), Color(0.28, 0, 0, 0))
 		var age: float = world.time - evaluation.born
-		labels.show_text(Detection.decoded(evaluation.label, age, hash(evaluation.label)), at + Vector3.UP * 1.05, Color(LABEL, alpha), EVALUATION_TEXT)
-		labels.show_text(Detection.decoded(evaluation.phase, age - 0.15, hash(evaluation.phase)), at + Vector3.DOWN * 0.95, Color(color, alpha), EVALUATION_TEXT * 0.8)
+		_evaluation_text(evaluation, at, color, alpha, age)
 		for build in evaluation.visible_builds():
 			_build(build, alpha)
+		if not evaluation.shards.is_empty():
+			glows.add(at, EVALUATION_RADIUS * 2.4, Color(Palette.SHARD, alpha * 0.7), Color(RING, 0.2, 0, 0))
+		for shard in evaluation.shards.values():
+			ribbons.trail(shard.electron.trail, Color(color, alpha * 0.8), 0.1)
+			glows.add(shard.electron.position, 0.4 + evaluation.flash * 0.5, Palette.shade(color, alpha * 0.6))
+			bodies.add(shard.electron.position, SHARD_RADIUS, Color(color, alpha), Color(0.28, 0, 0, 0))
+			if not shard.merging:
+				_evaluation_text(evaluation, shard.electron.position, color, alpha, age)
+
+
+func _evaluation_text(evaluation: Bodies.Evaluation, at: Vector3, color: Color, alpha: float, age: float) -> void:
+	labels.show_text(Detection.decoded(evaluation.label, age, hash(evaluation.label)), at + Vector3.UP * 1.05, Color(LABEL, alpha), EVALUATION_TEXT)
+	labels.show_text(Detection.decoded(evaluation.phase, age - 0.15, hash(evaluation.phase)), at + Vector3.DOWN * 0.95, Color(color, alpha), EVALUATION_TEXT * 0.8)
+
+
+func _moon_color(moon: Bodies.Vm) -> Color:
+	return moon.color if moon.lit else Palette.VM_DARK
+
+
+func _vms(world: World) -> void:
+	for moon in world.vms.values():
+		var color := _moon_color(moon)
+		if moon.lit:
+			glows.add(moon.position, 0.45 + moon.flash * 0.6, Palette.shade(color, moon.alpha * (0.6 + moon.flash * 0.8)))
+		bodies.add(moon.position, MOON_RADIUS, Color(color, moon.alpha), Color(0.3, 0, 0, 0))
+		var job: Effects.ExecJobChanged = world.exec_jobs.get(moon.job_id)
+		if moon.lit and job and job.label:
+			labels.show_text(job.label, moon.position + Vector3.UP * 0.8, Color(LABEL, moon.alpha), EVALUATION_TEXT * 0.8)
 
 
 func _build(build: Bodies.Build, alpha: float) -> void:

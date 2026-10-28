@@ -38,14 +38,25 @@ func test_companion_claims_split_the_evaluation_onto_their_workers() -> void:
 	equal(evaluation.shards[2].electron.host, World.worker_host("w3"))
 
 
-func test_shard_reply_draws_a_comet_from_the_primary_worker_to_the_companion() -> void:
+func shard_comets(world: World) -> Array:
+	return world.fx.filter(func(effect): return effect is RingComet)
+
+
+func ring_angle_gap(at: Vector3, worker: Bodies.Worker) -> float:
+	return absf(wrapf(RingComet.angle_of(at) - RingComet.angle_of(worker.position), -PI, PI))
+
+
+func test_shard_reply_travels_the_worker_ring_from_the_primary_to_the_companion() -> void:
 	var world := split_world()
 	step(world, 2.0)
 	send(world, "w3", true, "eval_shard_reply", "eval:e1:2")
-	var shard_comets := world.fx.filter(func(effect): return effect is Comet and effect.color == Palette.SHARD)
-	equal(shard_comets.size(), 1)
-	near(shard_comets[0].source.call().distance_to(world.workers["w1"].position), 0.0)
-	near(shard_comets[0].target.call().distance_to(world.workers["w3"].position), 0.0)
+	equal(shard_comets(world).size(), 1)
+	var comet: RingComet = shard_comets(world)[0]
+	var curve := comet.path()
+	near(ring_angle_gap(curve.x, world.workers["w1"]), 0.0)
+	near(ring_angle_gap(curve.z, world.workers["w3"]), 0.0)
+	var middle := (curve.x + 2.0 * curve.y + curve.z) / 4.0
+	near(Vector2(middle.x, middle.z).length(), World.WORKER_RING, 1e-3, "curve midpoint lies on the ring")
 
 
 func test_a_finished_companion_job_merges_its_piece() -> void:

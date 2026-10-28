@@ -70,4 +70,4 @@ static func _shard_reply(world: World, evaluation: Bodies.Evaluation, companion:
 	var primary: Bodies.Worker = world.workers.get(evaluation.primary_worker)
 	var source := (func() -> Vector3: return primary.position) if primary else world.follow(evaluation.electron)
 	var arrive := func() -> void: companion.heat = 1.0
-	world.spawn([Comet.new(source, func() -> Vector3: return companion.position, Palette.SHARD, 0.09, randf_range(0.9, 1.2), randf_range(-0.3, 0.3), arrive)])
+	world.spawn([RingComet.new(source, func() -> Vector3: return companion.position, Palette.SHARD, 0.09, randf_range(1.2, 1.6), arrive)])
