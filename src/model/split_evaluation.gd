@@ -19,6 +19,9 @@ static func on_message(world: World, evaluation: Bodies.Evaluation, index: int, 
 	if index == 0:
 		evaluation.primary_worker = worker.id
 		return
+	var shard: Bodies.Shard = evaluation.shards.get(index)
+	if message.kind != "assign_job" and shard and shard.worker_id != worker.id:
+		return
 	if message.kind in JOB_ENDS:
 		_end(world, evaluation, index)
 		return

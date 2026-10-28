@@ -31,11 +31,38 @@ func test_vm_lifecycle_warm_running_stopped() -> void:
 	check(not world.vms.has("v1"), "stopped moon removed")
 
 
-func test_unknown_vm_first_seen_as_stopped_is_removed() -> void:
+func test_the_stop_of_an_unseen_vm_spawns_no_moon() -> void:
 	var world := World.new()
 	vm(world, "stopped")
+	check(world.vms.is_empty(), "no phantom moon")
+
+
+func test_moons_fade_when_their_worker_disconnects() -> void:
+	var world := World.new()
+	vm(world, "warm")
+	world.apply(Effects.WorkerLink.new("w1", false))
 	step(world, World.EVAL_FADE + 0.5)
-	check(world.vms.is_empty(), "no moon left")
+	check(world.vms.is_empty(), "moons of an offline worker removed")
+
+
+func test_reconnect_snapshot_keeps_a_live_moon() -> void:
+	var world := World.new()
+	vm(world, "warm")
+	world.apply(Effects.WorkerLink.new("w1", false))
+	step(world, 0.5)
+	world.apply(Effects.WorkerLink.new("w1", true))
+	vm(world, "warm")
+	step(world, World.EVAL_FADE + 0.5)
+	check(world.vms.has("v1"), "live moon kept after reconnect")
+
+
+func test_fallback_moon_ends_with_the_job_messages() -> void:
+	var world := World.new()
+	world.apply(Effects.WorkerMessage.new("w1", true, "assign_job", 300, "exec:j1"))
+	world.update(0.1)
+	world.apply(Effects.WorkerMessage.new("w1", false, "job_completed", 50, "exec:j1"))
+	step(world, World.EVAL_LINGER + World.EVAL_FADE + 0.5)
+	check(world.vms.is_empty(), "fallback moon removed without exec_job events")
 
 
 func test_running_vm_gets_a_comet_from_its_evaluation() -> void:

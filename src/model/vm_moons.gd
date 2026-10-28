@@ -12,9 +12,14 @@ const TERMINAL := ["completed", "failed", "aborted"]
 static func vm_changed(world: World, change: Effects.VmChanged) -> void:
 	if change.job_id and world.vms.has(change.job_id):
 		world.vms.erase(change.job_id)
+	if change.state == "stopped" and not world.vms.has(change.vm):
+		return
 	var moon := _moon(world, change.vm, change.worker_id)
 	moon.flash = 1.0
 	moon.link = 1.0
+	if change.state != "stopped":
+		moon.fading = false
+		moon.alpha = 1.0
 	match change.state:
 		"warm":
 			moon.lit = false
@@ -54,6 +59,8 @@ static func exec_message(world: World, message: Effects.WorkerMessage, worker: B
 	if not moon:
 		return false
 	moon.link = 1.0
+	if moon.synthetic and message.kind in SplitEvaluation.JOB_ENDS and moon.linger < 0.0:
+		moon.linger = World.EVAL_LINGER
 	var at_moon := func() -> Vector3: return moon.position
 	var at_worker := func() -> Vector3: return worker.position
 	var color := Palette.message(message.kind)
@@ -68,6 +75,8 @@ static func exec_message(world: World, message: Effects.WorkerMessage, worker: B
 static func update(world: World, dt: float) -> void:
 	for id in world.vms.keys():
 		var moon: Bodies.Vm = world.vms[id]
+		var worker: Bodies.Worker = world.workers.get(moon.worker_id)
+		moon.fading = moon.fading or (worker and not worker.connected)
 		moon.electron.update(dt)
 		moon.flash *= pow(0.1, dt)
 		moon.link *= pow(0.25, dt)

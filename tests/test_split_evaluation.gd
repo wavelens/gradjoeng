@@ -76,6 +76,16 @@ func test_a_reassigned_shard_jumps_without_a_duplicate() -> void:
 	equal(evaluation.shards[1].electron.host, World.worker_host("w4"))
 
 
+func test_late_messages_from_the_previous_worker_leave_a_moved_shard() -> void:
+	var world := split_world()
+	send(world, "w4", true, "assign_job", "eval:e1:1")
+	send(world, "w2", false, "job_failed", "eval:e1:1")
+	send(world, "w2", false, "log_chunk", "eval:e1:1")
+	var shard: Bodies.Shard = world.evaluations["e1"].shards[1]
+	equal(shard.electron.host, World.worker_host("w4"))
+	check(not shard.merging, "shard keeps working on the new worker")
+
+
 func test_leaving_the_worker_phases_merges_every_piece() -> void:
 	var world := split_world()
 	world.apply(Effects.EvaluationChanged.new("e1", "building"))
