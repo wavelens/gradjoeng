@@ -84,6 +84,16 @@ class Build:
 		electron = p_electron
 
 
+class Shard:
+	var worker_id: String
+	var electron: Electron
+	var merging := false
+
+	func _init(p_worker_id: String, p_electron: Electron) -> void:
+		worker_id = p_worker_id
+		electron = p_electron
+
+
 class Evaluation:
 	var id: String
 	var phase := "queued"
@@ -93,6 +103,9 @@ class Evaluation:
 	var electron: Electron
 	var builds := {}
 	var uploads := {}
+	var shards := {}
+	var ended_shards := {}
+	var primary_worker := ""
 	var flash := 1.0
 	var idle := 0.0
 	var alpha := 1.0
@@ -108,7 +121,7 @@ class Evaluation:
 
 	var busy: bool:
 		get:
-			if electron.host.begins_with("worker:"):
+			if electron.host.begins_with("worker:") or not shards.is_empty():
 				return true
 			for build in builds.values():
 				if build.state == "building" or build.electron.host.begins_with("worker:"):

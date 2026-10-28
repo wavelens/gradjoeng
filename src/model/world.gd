@@ -161,6 +161,7 @@ func electrons() -> Array:
 	for evaluation in evaluations.values():
 		result.append(evaluation.electron)
 		result.append_array(evaluation.builds.values().map(func(build): return build.electron))
+		result.append_array(evaluation.shards.values().map(func(shard): return shard.electron))
 	return result
 
 
@@ -182,7 +183,7 @@ func _list_caches(listed: Dictionary) -> void:
 	_resolve(listed)
 
 
-func _spawn(effects: Array) -> void:
+func spawn(effects: Array) -> void:
 	fx.append_array(effects)
 
 
@@ -220,7 +221,7 @@ func _message(message: Effects.WorkerMessage) -> void:
 		calm = 0.0
 	if message.kind == "nar_push":
 		drought = 0.0
-	_claim(message.job_id, worker)
+	_claim(message, worker)
 	if message.kind == OFFER:
 		_offer(worker)
 		return
@@ -240,7 +241,7 @@ func _message(message: Effects.WorkerMessage) -> void:
 	var route := RandomNumberGenerator.new()
 	route.seed = hash("%s:%s:%s" % [message.worker_id, message.job_id, message.kind]) if message.job_id else randi()
 	var size := (1.5 + log(message.size + 1.0) / log(10.0) * 0.9) * 0.034
-	_spawn([Comet.new(source, target, Palette.message(message.kind), size, route.randf_range(0.55, 0.9), route.randf_range(-0.3, 0.3), arrive)])
+	spawn([Comet.new(source, target, Palette.message(message.kind), size, route.randf_range(0.55, 0.9), route.randf_range(-0.3, 0.3), arrive)])
 
 
 func _evaluation_changed(change: Effects.EvaluationChanged) -> void:
@@ -253,25 +254,26 @@ func _evaluation_changed(change: Effects.EvaluationChanged) -> void:
 		evaluation.label = Bodies.repository_label(change.repository)
 	var anchor := func() -> Vector3: return evaluation.position
 	if not change.phase:
-		_spawn([Comet.new(server_position, anchor, Palette.PROGRESS, 0.07, 0.9, 0.2)])
+		spawn([Comet.new(server_position, anchor, Palette.PROGRESS, 0.07, 0.9, 0.2)])
 		return
 	if change.phase == evaluation.phase:
 		return
 	evaluation.phase = change.phase
 	if change.phase not in WORKER_PHASES:
 		_send_home(evaluation)
+		SplitEvaluation.merge(self, evaluation)
 	if evaluation.finished:
 		for build in evaluation.builds.values():
 			_send_build_home(evaluation, build)
 	var color := Palette.state(change.phase)
-	_spawn([Ripple.new(anchor, color, 1.5, 1.0, 0.05)])
+	spawn([Ripple.new(anchor, color, 1.5, 1.0, 0.05)])
 	if change.phase == "completed":
-		_spawn(Spark.burst(evaluation.position, color, 90, 8.0, 1.6))
-		_spawn([Ripple.new(anchor, Color.WHITE, 3.4, 1.4, 0.09)])
+		spawn(Spark.burst(evaluation.position, color, 90, 8.0, 1.6))
+		spawn([Ripple.new(anchor, Color.WHITE, 3.4, 1.4, 0.09)])
 	elif change.phase in EventParser.BAD:
 		shake = maxf(shake, 1.0)
-		_spawn(Spark.burst(evaluation.position, color, 120, 9.8, 1.8))
-		_spawn([Ripple.new(anchor, color, 4.7, 1.2, 0.12)])
+		spawn(Spark.burst(evaluation.position, color, 120, 9.8, 1.8))
+		spawn([Ripple.new(anchor, color, 4.7, 1.2, 0.12)])
 
 
 func _build_changed(change: Effects.BuildChanged) -> void:
@@ -298,11 +300,11 @@ func _build_changed(change: Effects.BuildChanged) -> void:
 	if change.state == "substituted":
 		_substitute(evaluation, build, color)
 	elif change.state in EventParser.GOOD:
-		_spawn(Spark.burst(build.position, color, 18, 3.8, 0.9))
+		spawn(Spark.burst(build.position, color, 18, 3.8, 0.9))
 	elif change.state in EventParser.BAD:
 		shake = maxf(shake, 0.5)
-		_spawn(Spark.burst(build.position, color, 45, 6.4, 1.3))
-		_spawn([Ripple.new(func() -> Vector3: return build.position, color, 1.3, 0.8, 0.05)])
+		spawn(Spark.burst(build.position, color, 45, 6.4, 1.3))
+		spawn([Ripple.new(func() -> Vector3: return build.position, color, 1.3, 0.8, 0.05)])
 
 
 func _substitute(evaluation: Bodies.Evaluation, build: Bodies.Build, color: Color) -> void:
@@ -310,8 +312,8 @@ func _substitute(evaluation: Bodies.Evaluation, build: Bodies.Build, color: Colo
 	var arrive := func() -> void:
 		build.incoming = false
 		build.flash = 1.0
-		_spawn(Spark.burst(build.position, color, 18, 3.8, 0.9))
-	_spawn([Comet.new(_substitution_source(evaluation, build), func() -> Vector3: return build.position, color, 0.085, randf_range(1.0, 1.4), randf_range(-0.3, 0.3), arrive)])
+		spawn(Spark.burst(build.position, color, 18, 3.8, 0.9))
+	spawn([Comet.new(_substitution_source(evaluation, build), func() -> Vector3: return build.position, color, 0.085, randf_range(1.0, 1.4), randf_range(-0.3, 0.3), arrive)])
 
 
 func _substitution_source(evaluation: Bodies.Evaluation, build: Bodies.Build) -> Callable:
@@ -337,14 +339,15 @@ func _dispatch(dispatch: Effects.JobDispatched) -> void:
 	elif dispatch.evaluation_id:
 		var evaluation := _evaluation(dispatch.evaluation_id)
 		_start(evaluation)
-		_board(evaluation, worker)
+		board(evaluation, worker)
 
 
-func _board(job: Variant, worker: Bodies.Worker) -> void:
+func board(job: Variant, worker: Bodies.Worker) -> void:
 	job.electron.jump(worker_host(worker.id), func() -> Vector3: return worker.position, _worker_orbit(worker.id), 2 * SHOCK_TIME)
 
 
-func _claim(job_id: String, worker: Bodies.Worker) -> void:
+func _claim(message: Effects.WorkerMessage, worker: Bodies.Worker) -> void:
+	var job_id := message.job_id
 	var id := job_id.get_slice(":", 1)
 	var host := worker_host(worker.id)
 	match job_id.get_slice(":", 0):
@@ -354,8 +357,12 @@ func _claim(job_id: String, worker: Bodies.Worker) -> void:
 				return
 			evaluation.idle = 0.0
 			_start(evaluation)
+			var index := SplitEvaluation.shard_index(job_id)
+			SplitEvaluation.on_message(self, evaluation, index, message, worker)
+			if index > 0:
+				return
 			if evaluation.phase in WORKER_PHASES and evaluation.electron.host != host:
-				_board(evaluation, worker)
+				board(evaluation, worker)
 		"build":
 			dispatched[id] = worker.id
 			_board_derivation(id, worker)
@@ -382,7 +389,7 @@ func _start(evaluation: Bodies.Evaluation) -> void:
 func _board_derivation(derivation_build: String, worker: Bodies.Worker) -> void:
 	var build := _assigned_build(derivation_build)
 	if build and not build.finished and build.electron.host != worker_host(worker.id):
-		_board(build, worker)
+		board(build, worker)
 
 
 func _assign(derivation_build: String, evaluation_id: String) -> void:
@@ -427,7 +434,7 @@ func _offer(worker: Bodies.Worker) -> void:
 	var arrive := func() -> void:
 		offer.arrived = true
 		_reflect(worker)
-	_spawn([Shockwave.new(server_position, Palette.PING, worker.position.distance_to(server_position()), SHOCK_TIME, arrive)])
+	spawn([Shockwave.new(server_position, Palette.PING, worker.position.distance_to(server_position()), SHOCK_TIME, arrive)])
 
 
 func _answer(worker: Bodies.Worker) -> void:
@@ -444,11 +451,11 @@ func _reflect(worker: Bodies.Worker) -> void:
 	var at_worker := func() -> Vector3: return worker.position
 	var distance := worker.position.distance_to(server_position())
 	if offer.score == null:
-		_spawn([Shockwave.new(at_worker, Palette.PING, distance, SHOCK_TIME, Callable(), server_position, 0.3)])
+		spawn([Shockwave.new(at_worker, Palette.PING, distance, SHOCK_TIME, Callable(), server_position, 0.3)])
 		return
 	var quality: float = maxf(offer.score, 0.0) / (maxf(offer.score, 0.0) + SCORE_HALF)
 	var color := Palette.ECHO_BAD.lerp(Palette.ECHO_GOOD, quality)
-	_spawn([Shockwave.new(at_worker, color, distance, SHOCK_TIME, Callable(), server_position, 0.1 + 0.9 * quality)])
+	spawn([Shockwave.new(at_worker, color, distance, SHOCK_TIME, Callable(), server_position, 0.1 + 0.9 * quality)])
 
 
 func _send_home(evaluation: Bodies.Evaluation) -> void:
@@ -459,9 +466,9 @@ func _send_home(evaluation: Bodies.Evaluation) -> void:
 func _send_build_home(evaluation: Bodies.Evaluation, build: Bodies.Build) -> void:
 	var host := evaluation_host(evaluation.id)
 	if build.finished:
-		build.electron.jump(host, _follow(evaluation.electron), Orbit.new(0.0, 0.0, 0.0, 0.0))
+		build.electron.jump(host, follow(evaluation.electron), Orbit.new(0.0, 0.0, 0.0, 0.0))
 	elif build.electron.host != host:
-		build.electron.jump(host, _follow(evaluation.electron), _build_orbit(build.index))
+		build.electron.jump(host, follow(evaluation.electron), _build_orbit(build.index))
 
 
 func _join(evaluation: Bodies.Evaluation, group: String) -> void:
@@ -488,7 +495,7 @@ static func flare_height() -> float:
 func _erupt() -> void:
 	var root := Vector3(randfn(0, 1), randfn(0, 1) * 0.6, randfn(0, 1)).normalized()
 	var height := flare_height()
-	_spawn([Flare.new(root, SUN_RADIUS, height, FLARE_COLOR, 4.0 + height * 2.0)])
+	spawn([Flare.new(root, SUN_RADIUS, height, FLARE_COLOR, 4.0 + height * 2.0)])
 
 
 func _cache_access(access: Effects.CacheAccess) -> void:
@@ -508,7 +515,7 @@ func _cache_access(access: Effects.CacheAccess) -> void:
 		cache.alarm = 1.0
 		color = Palette.CACHE_MISS
 	var client := Vector3(cache.position.x + randf_range(-4.0, 4.0), SKY, cache.position.z)
-	_spawn([Comet.new(func() -> Vector3: return cache.position, func() -> Vector3: return client, color, size, randf_range(0.6, 0.9), randf_range(-0.3, 0.3))])
+	spawn([Comet.new(func() -> Vector3: return cache.position, func() -> Vector3: return client, color, size, randf_range(0.6, 0.9), randf_range(-0.3, 0.3))])
 
 
 func _store(cache_id: String) -> void:
@@ -517,13 +524,13 @@ func _store(cache_id: String) -> void:
 	if evaluation:
 		evaluation.uploads[cache_id] = true
 	var arrive := func() -> void: cache.flash = 1.0
-	_spawn([Comet.new(server_position, func() -> Vector3: return cache.position, Palette.STORE, 0.1, 1.3, randf_range(-0.2, 0.2), arrive)])
+	spawn([Comet.new(server_position, func() -> Vector3: return cache.position, Palette.STORE, 0.1, 1.3, randf_range(-0.2, 0.2), arrive)])
 
 
 func _query_caches() -> void:
 	for cache in caches.values():
 		var arrive := func() -> void: cache.flash = maxf(cache.flash, 0.4)
-		_spawn([Echo.new(server_position, func() -> Vector3: return cache.position, Palette.PING, 0.4, ECHO_TIME, arrive)])
+		spawn([Echo.new(server_position, func() -> Vector3: return cache.position, Palette.PING, 0.4, ECHO_TIME, arrive)])
 
 
 func _cache(cache_id: String) -> Bodies.Cache:
@@ -576,13 +583,13 @@ func _lane(group: String) -> int:
 func _build(evaluation: Bodies.Evaluation, build_id: String) -> Bodies.Build:
 	if not evaluation.builds.has(build_id):
 		var index := evaluation.builds.size()
-		var electron := Electron.new(evaluation_host(evaluation.id), _follow(evaluation.electron), _build_orbit(index), evaluation.position, 0.0)
+		var electron := Electron.new(evaluation_host(evaluation.id), follow(evaluation.electron), _build_orbit(index), evaluation.position, 0.0)
 		evaluation.builds[build_id] = Bodies.Build.new(build_id, index, electron)
 		build_owner[build_id] = evaluation.id
 	return evaluation.builds[build_id]
 
 
-func _follow(host: Electron) -> Callable:
+func follow(host: Electron) -> Callable:
 	return func() -> Vector3: return host.position
 
 
@@ -602,6 +609,8 @@ func _electrons_on(host: String) -> int:
 		count += int(evaluation.electron.host == host)
 		for build in evaluation.builds.values():
 			count += int(build.electron.host == host)
+		for shard in evaluation.shards.values():
+			count += int(shard.electron.host == host)
 	return count
 
 
@@ -636,7 +645,7 @@ func _update_workers(dt: float) -> void:
 		worker.link = move_toward(worker.link, 1.0 if worker.connected else 0.0, dt / LINK_FADE)
 		_place_worker(worker)
 		if worker.unstable and randf() < dt * UNSTABLE_SPARK_RATE:
-			_spawn(Spark.burst(worker.position, Palette.cpu(worker.cpu), 8, 3.0, 0.6))
+			spawn(Spark.burst(worker.position, Palette.cpu(worker.cpu), 8, 3.0, 0.6))
 
 
 func _update_evaluations(dt: float) -> void:
@@ -649,6 +658,7 @@ func _update_evaluations(dt: float) -> void:
 			_retire(evaluation)
 			continue
 		evaluation.electron.update(dt)
+		SplitEvaluation.update(evaluation, dt)
 		for build in evaluation.builds.values():
 			build.flash *= pow(0.1, dt)
 			build.electron.update(dt)
