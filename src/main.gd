@@ -35,6 +35,9 @@ func _ready() -> void:
 	if options.file:
 		_open_file(options)
 	else:
+		var permission_check := GradientTokenPermissionCheck.new(options.url, options.token)
+		permission_check.gradient_token_refused.connect(_fail)
+		add_child(permission_check)
 		_listen(WebSource.new(options.url, options.token))
 		_listen(MetricsPoll.new(options.url, options.token, options.poll))
 		directory = NameDirectory.new(options.url, options.token)

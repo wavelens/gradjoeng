@@ -33,7 +33,7 @@ nix run .#release -- --file events/1.log
 |---|---|---|
 | `--file FILE` | | Event log to replay; exclusive with `--url` |
 | `--url URL` | | Gradient instance to stream events from |
-| `--token TOKEN` | | API token, only with `--url` |
+| `--token TOKEN` | | API token, only with `--url`; see [API Key](#api-key) |
 | `--token-file FILE` | | File containing the API token, exclusive with `--token` |
 | `--poll SECONDS` | `5` | Interval for worker load and network polling |
 | `--speed SPEED` | `1` | Replay speed of `--file` |
@@ -51,6 +51,10 @@ With `--url`, Gradjöng reads:
 - `api/v1/caches`: all caches, idle ones included
 - `api/v1/projects/{project}/workers` and `api/v1/evals/{evaluation}`: worker and evaluation names
 - `api/v1/board/jobs/dispatched`: evaluation of build jobs whose dispatch the stream did not show
+
+## API Key
+
+The live view must use an API key that a Gradient superuser created in `Settings -> API Keys`, with `readSuperuser` and no project or cache pin. Event streams reject that key without `readSuperuser`. Boards show no workers from other projects. All Gradjöng requests are read requests, so `writeSuperuser` is not necessary. Rejected keys make Gradjöng exit and report the missing permission.
 
 ## Controls
 

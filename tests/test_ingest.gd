@@ -68,6 +68,15 @@ func test_bearer_header_only_with_token() -> void:
 	equal(Endpoints.bearer(""), PackedStringArray())
 
 
+func test_permission_error_message_for_403_401_426_and_fallback() -> void:
+	var refused := JSON.stringify({"code": "superuser_required", "missing_permissions": ["readSuperuser", "writeSuperuser"]})
+	var message := GradientTokenPermissionCheck.api_key_permission_error_message(403, refused)
+	check(message.contains("readSuperuser, writeSuperuser"), message)
+	check(GradientTokenPermissionCheck.api_key_permission_error_message(403, "{}").contains("readSuperuser"))
+	check(GradientTokenPermissionCheck.api_key_permission_error_message(401, "").contains("--token"))
+	equal(GradientTokenPermissionCheck.api_key_permission_error_message(426, ""), "")
+
+
 func test_worker_metrics_events_from_board_response() -> void:
 	var body := JSON.stringify({"error": false, "message": [
 		{"id": "w1", "cpu_usage_pct": 42.5},
