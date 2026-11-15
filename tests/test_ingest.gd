@@ -69,10 +69,13 @@ func test_bearer_header_only_with_token() -> void:
 
 
 func test_permission_error_message_for_403_401_426_and_fallback() -> void:
-	var refused := JSON.stringify({"code": "superuser_required", "missing_permissions": ["readSuperuser", "writeSuperuser"]})
+	var refused := JSON.stringify({"code": "superuser_required", "missing_permissions": ["readSuperuser"]})
 	var message := GradientTokenPermissionCheck.api_key_permission_error_message(403, refused)
-	check(message.contains("readSuperuser, writeSuperuser"), message)
-	check(GradientTokenPermissionCheck.api_key_permission_error_message(403, "{}").contains("readSuperuser"))
+	check(message.contains("readSuperuser permission") and message.contains("superuser"), message)
+	var forbidden_body_with_non_superuser_error_code := JSON.stringify({"code": "forbidden", "message": "key is pinned to a project"})
+	message = GradientTokenPermissionCheck.api_key_permission_error_message(403, forbidden_body_with_non_superuser_error_code)
+	check(message.contains("key is pinned to a project") and not message.contains("readSuperuser"), message)
+	check(GradientTokenPermissionCheck.api_key_permission_error_message(403, "garbage").contains("garbage"))
 	check(GradientTokenPermissionCheck.api_key_permission_error_message(401, "").contains("--token"))
 	equal(GradientTokenPermissionCheck.api_key_permission_error_message(426, ""), "")
 

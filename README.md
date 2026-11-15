@@ -54,7 +54,7 @@ With `--url`, Gradjöng reads:
 
 ## API Key
 
-The live view must use an API key that a Gradient superuser created in `Settings -> API Keys`, with `readSuperuser` and no project or cache pin. Event streams reject that key without `readSuperuser`. Boards show no workers from other projects. All Gradjöng requests are read requests, so `writeSuperuser` is not necessary. Rejected keys make Gradjöng exit and report the missing permission.
+Set up live view with an API key. Create the key as a Gradient superuser in `Settings -> API Keys`. Set `readSuperuser` on the key and leave out any project or cache pin. Without `readSuperuser`, requests to the event stream fail and boards show no workers from other projects. All Gradjöng requests are read requests, so the key doesn't need `writeSuperuser`. Caches with no subscription from a visible project show a name only with a cache permission such as `viewCache` on the key. Otherwise Gradjöng can show the cache IDs. Failed keys make Gradjöng exit and report the missing permissions.
 
 ## Controls
 
