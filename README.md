@@ -48,13 +48,13 @@ With `--url`, Gradjöng reads:
 - `api/v1/metrics/events`: event stream
 - `api/v1/board/workers`: worker color by CPU load (green-blue-red, unstable at 90%+)
 - `api/v1/board/network`: proto traffic rate and average worker throughput (`UTIL`)
-- `api/v1/caches`: all caches, idle ones included
+- `api/v1/caches`: caches that visible projects subscribe to, idle ones included
 - `api/v1/projects/{project}/workers` and `api/v1/evals/{evaluation}`: worker and evaluation names
 - `api/v1/board/jobs/dispatched`: evaluation of build jobs whose dispatch the stream did not show
 
 ## API Key
 
-Set up live view with an API key. Create the key as a Gradient superuser in `Settings -> API Keys`. Set `readSuperuser` on the key and leave out any project or cache pin. Without `readSuperuser`, requests to the event stream fail and boards show no workers from other projects. All Gradjöng requests are read requests, so the key doesn't need `writeSuperuser`. Caches with no subscription from a visible project show a name only with a cache permission such as `viewCache` on the key. Otherwise Gradjöng can show the cache IDs. Failed keys make Gradjöng exit and report the missing permissions.
+Set up live view with an API key. Create the key as a Gradient superuser in `Settings -> API Keys`. Set `readSuperuser` on the key and leave out any project or cache pin. Without `readSuperuser`, requests to the event stream fail and boards show no workers from other projects. All Gradjöng requests are read requests, so the key doesn't need `writeSuperuser`. Cache permissions for a key, such as `viewCache`, also add caches that the key owner created and caches with a role for the owner. Gradjöng can show other caches by ID. Failed keys make Gradjöng exit and report the missing permissions.
 
 ## Controls
 
